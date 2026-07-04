@@ -1023,11 +1023,17 @@
       <!-- Diary Sub-Page -->
       <div class="sub-page active" id="sub-diary">
         <div class="card">
-          <div class="card-title">今日心情 & 日记</div>
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span id="diaryTodayTitle">今日心情 & 日记</span>
+            <span id="diaryTodayActions" style="display:none">
+              <button class="btn btn-small btn-outline" onclick="editTodayDiary()">编辑</button>
+              <button class="btn btn-small btn-outline" onclick="deleteTodayDiary()" style="color:var(--danger)">删除</button>
+            </span>
+          </div>
           <div id="diaryTodayEntry"></div>
         </div>
         <div class="card" id="diaryMoodCard">
-          <div class="card-title">今天的心情</div>
+          <div class="card-title">心情</div>
           <div class="mood-selector" id="moodSelector">
             <div class="mood-option" data-mood="5" onclick="selectMood(5)"><span class="mood-emoji">😄</span><span class="mood-label">很开心</span></div>
             <div class="mood-option" data-mood="4" onclick="selectMood(4)"><span class="mood-emoji">🙂</span><span class="mood-label">还不错</span></div>
@@ -1039,8 +1045,12 @@
         <div class="card">
           <div class="card-title">写日记</div>
           <div class="form-group">
-            <label class="form-label">今日事件 / 想记录的事</label>
-            <textarea class="form-textarea" id="diaryEvent" placeholder="今天发生了什么？做了什么？" style="min-height:80px"></textarea>
+            <label class="form-label">日期</label>
+            <input type="date" class="form-input" id="diaryDate" value="">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事件 / 想记录的事</label>
+            <textarea class="form-textarea" id="diaryEvent" placeholder="发生了什么？做了什么？" style="min-height:80px"></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">感受 / 想法</label>
