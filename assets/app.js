@@ -6,7 +6,7 @@ function loadData() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { clothes: [], records: [], nextId: 1, nextRecordId: 1, diaries: [], nextDiaryId: 1 };
+  return { clothes: [], records: [], nextId: 1, nextRecordId: 1, diaries: [], nextDiaryId: 1, presets: [], nextPresetId: 1 };
 }
 
 function saveData(data) {
@@ -548,31 +548,181 @@ function setFilter(val) {
   renderWardrobe();
 }
 
+// === Preset Outfits (Fixed Combos) ===
+var presetSelectedIds = [];
+var editingPresetId = null;
+
+function openPresetModal(presetId) {
+  presetSelectedIds = [];
+  editingPresetId = presetId || null;
+
+  document.getElementById('presetName').value = '';
+  document.getElementById('presetEditId').value = '';
+
+  if (presetId) {
+    var preset = appData.presets.find(function(p) { return p.id === presetId; });
+    if (preset) {
+      document.getElementById('presetName').value = preset.name || '';
+      presetSelectedIds = preset.clothingIds.slice();
+      document.getElementById('presetEditId').value = presetId;
+      document.getElementById('presetModalTitle').textContent = '编辑固定搭配';
+    }
+  } else {
+    document.getElementById('presetModalTitle').textContent = '创建固定搭配';
+  }
+
+  renderPresetClothingList();
+  renderPresetSelectedChips();
+  document.getElementById('presetModal').classList.add('active');
+}
+
+function closePresetModal() {
+  document.getElementById('presetModal').classList.remove('active');
+}
+
+function renderPresetClothingList() {
+  var html = '';
+  appData.clothes.forEach(function(c) {
+    var selected = presetSelectedIds.indexOf(c.id) !== -1;
+    html += '<div onclick="togglePresetClothing(' + c.id + ')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;background:' + (selected ? 'var(--accent-light, #fdf5f0)' : 'var(--bg2)') + ';border:1px solid ' + (selected ? 'var(--accent)' : 'transparent') + ';margin-bottom:4px;font-size:0.82rem">';
+    html += '<span style="font-size:0.9rem">' + categoryIcons[c.category] + '</span>';
+    html += '<span style="flex:1">' + c.name + '</span>';
+    html += '<span style="font-size:0.72rem;color:var(--muted)">' + c.category + '</span>';
+    if (selected) html += '<span style="color:var(--accent);font-weight:700">✓</span>';
+    html += '</div>';
+  });
+  if (appData.clothes.length === 0) {
+    html = '<div style="text-align:center;color:var(--muted);font-size:0.82rem;padding:16px">衣橱为空，先添加衣物</div>';
+  }
+  document.getElementById('presetClothingList').innerHTML = html;
+}
+
+function renderPresetSelectedChips() {
+  var html = '';
+  if (presetSelectedIds.length === 0) {
+    html = '<span style="color:var(--muted);font-size:0.82rem">点击上方衣物添加</span>';
+  } else {
+    presetSelectedIds.forEach(function(cid) {
+      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+      if (c) {
+        html += '<span class="outfit-chip" style="cursor:pointer" onclick="togglePresetClothing(' + cid + ')">';
+        html += categoryIcons[c.category] + ' ' + c.name + ' ×';
+        html += '</span>';
+      }
+    });
+  }
+  document.getElementById('presetSelectedChips').innerHTML = html;
+}
+
+function togglePresetClothing(clothId) {
+  var idx = presetSelectedIds.indexOf(clothId);
+  if (idx === -1) {
+    presetSelectedIds.push(clothId);
+  } else {
+    presetSelectedIds.splice(idx, 1);
+  }
+  renderPresetClothingList();
+  renderPresetSelectedChips();
+}
+
+function savePreset() {
+  var name = document.getElementById('presetName').value.trim();
+  if (!name) { showToast('请输入搭配名称'); return; }
+  if (presetSelectedIds.length === 0) { showToast('请选择至少一件衣物'); return; }
+
+  if (editingPresetId) {
+    var preset = appData.presets.find(function(p) { return p.id === editingPresetId; });
+    if (preset) {
+      preset.name = name;
+      preset.clothingIds = presetSelectedIds.slice();
+    }
+  } else {
+    appData.presets.push({
+      id: appData.nextPresetId++,
+      name: name,
+      clothingIds: presetSelectedIds.slice()
+    });
+  }
+
+  saveData(appData);
+  closePresetModal();
+  showToast('搭配已保存');
+  renderWardrobe();
+}
+
+function deletePreset(presetId) {
+  if (!confirm('确定要删除这个固定搭配吗？')) return;
+  appData.presets = appData.presets.filter(function(p) { return p.id !== presetId; });
+  saveData(appData);
+  renderWardrobe();
+  showToast('已删除');
+}
+
+function usePreset(presetId) {
+  var preset = appData.presets.find(function(p) { return p.id === presetId; });
+  if (!preset) return;
+  outfitSelectedIds = preset.clothingIds.slice();
+  editingOutfitId = null;
+  document.getElementById('outfitDate').value = todayStr();
+  document.getElementById('outfitNote').value = '';
+  renderOutfitSelectList();
+  document.getElementById('outfitModal').classList.add('active');
+}
+
+// === Wardrobe Page ===
 function renderWardrobe() {
   var search = document.getElementById('searchInput').value.trim().toLowerCase();
-  var list = appData.clothes.filter(function(c) {
-    if (currentFilter !== 'all' && c.category !== currentFilter) return false;
-    if (search && c.name.toLowerCase().indexOf(search) === -1) return false;
-    return true;
-  });
-
-  // Sort: by category, then by name
-  var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰'];
-  list.sort(function(a, b) {
-    var ai = catOrder.indexOf(a.category);
-    var bi = catOrder.indexOf(b.category);
-    if (ai !== bi) return ai - bi;
-    return a.name.localeCompare(b.name);
-  });
-
   var html = '';
-  if (list.length === 0) {
-    html = '<div class="empty-state">';
-    html += '<div class="empty-icon">👕</div>';
-    html += '<div class="empty-text">衣橱空空如也<br>点击右上角添加衣物</div>';
-    html += '</div>';
-  } else {
-    list.forEach(function(c) {
+
+  // Show presets when filter is "搭配" or "all"
+  if (currentFilter === '搭配' || currentFilter === 'all') {
+    var presets = appData.presets || [];
+    if (currentFilter === 'all' && presets.length > 0) {
+      // Show a collapsible section in "all" view
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 8px;cursor:pointer" onclick="document.getElementById(\'presetListAll\').classList.toggle(\'hidden\')">';
+      html += '<span style="font-weight:600;font-size:0.92rem">固定搭配 (' + presets.length + ')</span>';
+      html += '<span style="font-size:0.78rem;color:var(--muted)">展开/收起 ▾</span>';
+      html += '</div>';
+      html += '<div id="presetListAll">';
+      html += renderPresetCards(presets, search);
+      html += '</div>';
+    } else if (currentFilter === '搭配') {
+      if (presets.length === 0) {
+        html += '<div class="empty-state">';
+        html += '<div class="empty-icon">👔</div>';
+        html += '<div class="empty-text">还没有固定搭配<br>点击下方创建</div>';
+        html += '</div>';
+      } else {
+        html += renderPresetCards(presets, search);
+      }
+    }
+  }
+
+  // Show individual clothes when filter is not "搭配"
+  if (currentFilter !== '搭配') {
+    var list = appData.clothes.filter(function(c) {
+      if (currentFilter !== 'all' && c.category !== currentFilter) return false;
+      if (search && c.name.toLowerCase().indexOf(search) === -1) return false;
+      return true;
+    });
+
+    var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰'];
+    list.sort(function(a, b) {
+      var ai = catOrder.indexOf(a.category);
+      var bi = catOrder.indexOf(b.category);
+      if (ai !== bi) return ai - bi;
+      return a.name.localeCompare(b.name);
+    });
+
+    if (list.length === 0 && currentFilter === 'all') {
+      // presets already shown above
+    } else if (list.length === 0) {
+      html += '<div class="empty-state">';
+      html += '<div class="empty-icon">👕</div>';
+      html += '<div class="empty-text">该分类下暂无衣物</div>';
+      html += '</div>';
+    } else {
+      list.forEach(function(c) {
       var wearCount = getClothingWearCount(c.id);
       var costPerWear = wearCount > 0 ? (c.price / wearCount).toFixed(1) : '-';
       var stars = '';
@@ -607,8 +757,55 @@ function renderWardrobe() {
       html += '</div>';
       html += '</div>';
     });
+    }
   }
+
+  // Add "create preset" button at bottom when in 搭配 filter
+  if (currentFilter === '搭配') {
+    html += '<div style="text-align:center;margin-top:12px">';
+    html += '<button class="btn btn-small btn-primary" onclick="openPresetModal()">+ 创建固定搭配</button>';
+    html += '</div>';
+  }
+
   document.getElementById('wardrobeList').innerHTML = html;
+}
+
+function renderPresetCards(presets, search) {
+  var html = '';
+  var filtered = presets.filter(function(p) {
+    if (!search) return true;
+    if (p.name.toLowerCase().indexOf(search) !== -1) return true;
+    return p.clothingIds.some(function(cid) {
+      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+      return c && c.name.toLowerCase().indexOf(search) !== -1;
+    });
+  });
+
+  filtered.forEach(function(preset) {
+    html += '<div class="clothing-item">';
+    html += '<div class="clothing-color" style="background:var(--accent)"></div>';
+    html += '<div class="clothing-info">';
+    html += '<div class="clothing-name">' + escapeHtml(preset.name) + '</div>';
+    html += '<div class="clothing-meta">';
+    html += '<span class="tag tag-gray">搭配 · ' + preset.clothingIds.length + '件</span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">';
+    preset.clothingIds.forEach(function(cid) {
+      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+      if (c) {
+        html += '<span class="outfit-chip">' + categoryIcons[c.category] + ' ' + c.name + '</span>';
+      }
+    });
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="clothing-actions">';
+    html += '<button class="btn btn-small btn-primary" onclick="usePreset(' + preset.id + ')" title="一键穿搭">👔穿</button>';
+    html += '<button class="btn btn-small btn-outline" onclick="openPresetModal(' + preset.id + ')" title="编辑">✏️</button>';
+    html += '<button class="btn btn-small btn-outline" onclick="deletePreset(' + preset.id + ')" title="删除" style="color:var(--danger)">🗑</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  return html;
 }
 
 // === Calendar Page ===
