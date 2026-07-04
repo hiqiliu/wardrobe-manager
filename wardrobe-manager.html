@@ -695,7 +695,7 @@
     /* Quick add buttons */
     .quick-add-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
     .quick-add-btn {
@@ -846,6 +846,12 @@
     }
 
     .health-drink-type.active {
+      background: var(--accent) !important;
+      color: white !important;
+      border-color: var(--accent) !important;
+    }
+
+    .health-workout-type.active {
       background: var(--accent) !important;
       color: white !important;
       border-color: var(--accent) !important;
@@ -1100,6 +1106,10 @@
               <span class="quick-add-icon">☕</span>
               <span class="quick-add-label">饮品</span>
             </div>
+            <div class="quick-add-btn" onclick="openHealthModal('workout')">
+              <span class="quick-add-icon">🏋️</span>
+              <span class="quick-add-label">健身</span>
+            </div>
           </div>
         </div>
 
@@ -1116,6 +1126,17 @@
             <button class="btn btn-small btn-primary" onclick="openHealthModal('body')">记录</button>
           </div>
           <div id="healthBodyStats"></div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="card">
+          <div class="card-title">数据管理</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-small btn-secondary" onclick="openImportModal()">📥 导入旧数据</button>
+            <button class="btn btn-small btn-primary" onclick="exportAllData()">📤 导出全部数据</button>
+            <button class="btn btn-small btn-outline" onclick="importAllData()">📥 同步数据</button>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:8px">导出: 将所有数据保存为文件 | 同步: 从导出文件恢复数据到当前设备</div>
         </div>
       </div>
     </div>
@@ -1402,6 +1423,23 @@
     </div>
   </div>
 
+  <!-- Modal: Import Data -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">导入健康数据</div>
+      <div style="margin-bottom:16px">
+        <label class="form-label">选择 habit-tracker 备份文件 (JSON)</label>
+        <input type="file" accept=".json" id="importFileInput" style="width:100%;padding:10px;border:1px dashed var(--rule);border-radius:8px;background:var(--bg2)">
+      </div>
+      <div id="importPreview"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeImportModal()">取消</button>
+        <button class="btn btn-primary" style="flex:1" id="importBtn" onclick="executeImport()" disabled>导入</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: View Diary Entry -->
   <div class="modal-overlay" id="diaryViewModal">
     <div class="modal">
@@ -1556,6 +1594,66 @@
         <div class="form-group">
           <label class="form-label">备注</label>
           <input type="text" class="form-input" id="healthDrinkNote" placeholder="自制拿铁、冰美式...">
+        </div>
+      </div>
+
+      <!-- Workout fields -->
+      <div id="healthFields-workout" style="display:none">
+        <div class="form-group">
+          <label class="form-label">运动类型</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-small btn-outline health-workout-type active" data-val="run" onclick="selectWorkoutType('run')">🏃 跑步</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="strength" onclick="selectWorkoutType('strength')">🏋️ 力量训练</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="yoga" onclick="selectWorkoutType('yoga')">🧘 瑜伽</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="walk" onclick="selectWorkoutType('walk')">🚶 散步</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="hiit" onclick="selectWorkoutType('hiit')">🔥 HIIT</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="swim" onclick="selectWorkoutType('swim')">🏊 游泳</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="cycle" onclick="selectWorkoutType('cycle')">🚴 骑行</button>
+            <button class="btn btn-small btn-outline health-workout-type" data-val="other" onclick="selectWorkoutType('other')">💪 其他</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">时长 (分钟)</label>
+          <input type="number" class="form-input" id="healthWorkoutDuration" placeholder="30" min="1">
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn btn-small btn-outline" onclick="document.getElementById('healthWorkoutDuration').value=15">15min</button>
+            <button class="btn btn-small btn-outline" onclick="document.getElementById('healthWorkoutDuration').value=30">30min</button>
+            <button class="btn btn-small btn-outline" onclick="document.getElementById('healthWorkoutDuration').value=45">45min</button>
+            <button class="btn btn-small btn-outline" onclick="document.getElementById('healthWorkoutDuration').value=60">60min</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">强度</label>
+          <div class="mood-selector" style="gap:4px">
+            <div class="mood-option" data-intensity="1" onclick="selectWorkoutIntensity(1)">
+              <span class="mood-emoji">😌</span>
+              <span class="mood-label">轻松</span>
+            </div>
+            <div class="mood-option" data-intensity="2" onclick="selectWorkoutIntensity(2)">
+              <span class="mood-emoji">🙂</span>
+              <span class="mood-label">适中</span>
+            </div>
+            <div class="mood-option" data-intensity="3" onclick="selectWorkoutIntensity(3)">
+              <span class="mood-emoji">😤</span>
+              <span class="mood-label">吃力</span>
+            </div>
+            <div class="mood-option" data-intensity="4" onclick="selectWorkoutIntensity(4)">
+              <span class="mood-emoji">🥵</span>
+              <span class="mood-label">很累</span>
+            </div>
+            <div class="mood-option" data-intensity="5" onclick="selectWorkoutIntensity(5)">
+              <span class="mood-emoji">💀</span>
+              <span class="mood-label">极限</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">训练内容</label>
+          <textarea class="form-textarea" id="healthWorkoutContent" placeholder="具体做了什么：深蹲3组x12、平板支撑3组x30秒..." style="min-height:50px"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">身体感受</label>
+          <input type="text" class="form-input" id="healthWorkoutFeel" placeholder="膝盖有点酸、出很多汗、做完很舒服...">
         </div>
       </div>
 
