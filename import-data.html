@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>数据导入 - 健康记录</title>
+  <title>导入 Apple Health 数据</title>
   <style>
     :root {
       --bg: #faf8f5;
@@ -107,9 +107,22 @@
       display: none;
     }
 
+    .help-text {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+    .help-text code {
+      background: var(--bg2);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
     .stat-item {
@@ -230,39 +243,28 @@
       font-size: 2rem;
       margin-bottom: 8px;
     }
-
-    .badge {
-      display: inline-block;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 500;
-      margin-left: 6px;
-    }
-    .badge-meal { background: #fef3c7; color: #92400e; }
-    .badge-sleep { background: #ede9fe; color: #5b21b6; }
-    .badge-bowel { background: #d1fae5; color: #065f46; }
-    .badge-water { background: #dbeafe; color: #1e40af; }
-    .badge-skip { background: var(--bg2); color: var(--muted); text-decoration: line-through; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>数据导入</h1>
-    <p>从备份文件导入健康记录到本地存储</p>
+    <h1>导入 Apple Health 数据</h1>
+    <p>从 iPhone 健康 app 导出的 XML 文件导入睡眠记录</p>
   </div>
 
   <div class="container">
     <!-- Upload -->
     <div class="card">
-      <div class="card-title">选择备份文件</div>
+      <div class="card-title">选择文件</div>
       <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
         <div class="upload-icon">📁</div>
-        <div class="upload-text">点击选择 JSON 备份文件</div>
+        <div class="upload-text">点击选择 export.xml</div>
         <div class="upload-filename" id="fileName"></div>
       </div>
-      <input type="file" class="file-input" id="fileInput" accept=".json,application/json" onchange="handleFile(event)">
+      <input type="file" class="file-input" id="fileInput" accept=".xml" onchange="handleFile(event)">
+      <div class="help-text">
+        导出方法：iPhone 健康 app → 右上角头像 → 导出所有健康数据 → 解压 export.zip → 选择其中的 <code>apple_health_export/export.xml</code>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -270,24 +272,19 @@
       <div class="card-title">导入统计</div>
       <div class="stats">
         <div class="stat-item">
-          <div class="stat-icon">🍽️</div>
-          <div class="stat-count" id="countMeal">0</div>
-          <div class="stat-label">饮食</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-icon">💧</div>
-          <div class="stat-count" id="countWater">0</div>
-          <div class="stat-label">饮水</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-icon">🚽</div>
-          <div class="stat-count" id="countBowel">0</div>
-          <div class="stat-label">排泄</div>
-        </div>
-        <div class="stat-item">
           <div class="stat-icon">😴</div>
           <div class="stat-count" id="countSleep">0</div>
-          <div class="stat-label">睡眠</div>
+          <div class="stat-label">睡眠记录</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-icon">📅</div>
+          <div class="stat-count" id="countDays">0</div>
+          <div class="stat-label">天数</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-count" id="countHours">0</div>
+          <div class="stat-label">总小时</div>
         </div>
       </div>
       <div style="text-align:right;font-size:0.78rem;color:var(--muted);margin-top:10px" id="totalCount"></div>
@@ -295,7 +292,7 @@
 
     <!-- Preview -->
     <div class="card hidden" id="previewCard">
-      <div class="card-title">预览 (前50条)</div>
+      <div class="card-title">预览 (前30条)</div>
       <div class="preview-list" id="previewList"></div>
     </div>
 
@@ -308,7 +305,6 @@
 
   <script>
     var convertedRecords = [];
-    var skippedCount = 0;
 
     function handleFile(event) {
       var file = event.target.files[0];
@@ -323,8 +319,7 @@
       var reader = new FileReader();
       reader.onload = function(e) {
         try {
-          var data = JSON.parse(e.target.result);
-          processBackup(data);
+          processAppleHealthXML(e.target.result);
         } catch (err) {
           showMessage('error', '解析文件失败：' + err.message);
         }
@@ -332,64 +327,93 @@
       reader.readAsText(file);
     }
 
-    function processBackup(data) {
+    function processAppleHealthXML(xmlText) {
       convertedRecords = [];
-      skippedCount = 0;
 
-      var sources = [];
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(xmlText, 'text/xml');
+      var records = doc.querySelectorAll('Record[type="HKCategoryTypeIdentifierSleepAnalysis"]');
 
-      // Collect records from food.meals (actual structure of habit-tracker backup)
-      if (data.food && Array.isArray(data.food.meals)) {
-        sources = sources.concat(data.food.meals);
-      }
-      // Also check dailyRecords for compatibility
-      if (data.dailyRecords && Array.isArray(data.dailyRecords.records)) {
-        sources = sources.concat(data.dailyRecords.records);
+      if (records.length === 0) {
+        showMessage('error', '未找到睡眠数据。请确认文件是 Apple Health 导出的 export.xml，且包含睡眠记录。');
+        return;
       }
 
-      // Convert each record
-      sources.forEach(function(src) {
-        var record = convertRecord(src);
-        if (record) {
-          convertedRecords.push(record);
-        } else {
-          skippedCount++;
+      // Group sleep records by date
+      var sleepByDate = {};
+
+      records.forEach(function(record) {
+        var value = record.getAttribute('value');
+        // Only import actual sleep (not "in bed" or awake)
+        if (value !== 'HKCategoryValueSleepAnalysisAsleep' &&
+            value !== 'HKCategoryValueSleepAnalysisAsleepCore' &&
+            value !== 'HKCategoryValueSleepAnalysisAsleepDeep' &&
+            value !== 'HKCategoryValueSleepAnalysisAsleepREM') {
+          return;
         }
+
+        var startDateStr = record.getAttribute('startDate');
+        var endDateStr = record.getAttribute('endDate');
+        if (!startDateStr || !endDateStr) return;
+
+        var start = parseAppleHealthDate(startDateStr);
+        var end = parseAppleHealthDate(endDateStr);
+        if (!start || !end) return;
+
+        var dateKey = formatDate(start);
+        if (!sleepByDate[dateKey]) {
+          sleepByDate[dateKey] = [];
+        }
+        sleepByDate[dateKey].push({ start: start, end: end });
       });
 
-      // Skip items with title "运动" and title "拉屎" as instructed
-      if (data.items && Array.isArray(data.items)) {
-        // These are skipped per requirements - exercise and bowel items
-      }
+      // Convert to app format: merge sleep periods per day
+      Object.keys(sleepByDate).sort().forEach(function(dateStr) {
+        var periods = sleepByDate[dateStr];
+        // Sort by start time
+        periods.sort(function(a, b) { return a.start - b.start; });
 
-      // Sort by date desc, then time
-      convertedRecords.sort(function(a, b) {
-        return a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '');
+        // Find bedtime (earliest start) and waketime (latest end)
+        var bedtime = periods[0].start;
+        var waketime = periods[periods.length - 1].end;
+
+        // Calculate total sleep duration in hours
+        var totalMinutes = 0;
+        periods.forEach(function(p) {
+          totalMinutes += (p.end - p.start) / 60000;
+        });
+
+        var duration = totalMinutes / 60;
+
+        // Format times
+        var bedTimeStr = formatTime(bedtime);
+        var wakeTimeStr = formatTime(waketime);
+
+        convertedRecords.push({
+          id: Date.now() + Math.random() * 10000,
+          type: 'sleep',
+          date: dateStr,
+          time: bedTimeStr,
+          bedtime: bedTimeStr,
+          waketime: wakeTimeStr,
+          duration: duration,
+          rating: 0,
+          note: '从 Apple Health 导入 (' + periods.length + ' 段睡眠)',
+          createdAt: Date.now()
+        });
       });
 
       // Show stats
-      var counts = { meal: 0, water: 0, bowel: 0, sleep: 0 };
-      convertedRecords.forEach(function(r) {
-        if (counts[r.type] !== undefined) counts[r.type]++;
-      });
-
-      document.getElementById('countMeal').textContent = counts.meal;
-      document.getElementById('countWater').textContent = counts.water;
-      document.getElementById('countBowel').textContent = counts.bowel;
-      document.getElementById('countSleep').textContent = counts.sleep;
-      document.getElementById('totalCount').textContent =
-        '共 ' + convertedRecords.length + ' 条记录' + (skippedCount > 0 ? '，跳过 ' + skippedCount + ' 条' : '');
-
+      var totalHours = convertedRecords.reduce(function(sum, r) { return sum + r.duration; }, 0);
+      document.getElementById('countSleep').textContent = convertedRecords.length;
+      document.getElementById('countDays').textContent = convertedRecords.length;
+      document.getElementById('countHours').textContent = totalHours.toFixed(1);
+      document.getElementById('totalCount').textContent = '共 ' + convertedRecords.length + ' 天睡眠记录，总计 ' + totalHours.toFixed(1) + ' 小时';
       document.getElementById('statsCard').classList.remove('hidden');
 
       // Show preview
-      var typeIcons = { meal: '🍽️', water: '💧', bowel: '🚽', sleep: '😴' };
-      var typeLabels = { meal: '饮食', water: '饮水', bowel: '排泄', sleep: '睡眠' };
-      var mealTypeLabels = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
-      var bowelLabels = { normal: '正常', loose: '偏稀', constipation: '便秘' };
-
       var previewHtml = '';
-      var previewItems = convertedRecords.slice(0, 50);
+      var previewItems = convertedRecords.slice(-30).reverse(); // show latest first
       if (previewItems.length === 0) {
         previewHtml = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">没有可导入的记录</div></div>';
       } else {
@@ -397,28 +421,16 @@
           var parts = r.date.split('-');
           var dateLabel = parseInt(parts[1]) + '月' + parseInt(parts[2]) + '日';
           previewHtml += '<div class="preview-item">';
-          previewHtml += '<div class="preview-icon">' + (typeIcons[r.type] || '❓') + '</div>';
+          previewHtml += '<div class="preview-icon">😴</div>';
           previewHtml += '<div class="preview-content">';
-          previewHtml += '<div class="preview-date">' + dateLabel + ' ' + (r.time || '') + '</div>';
-          var desc = typeLabels[r.type] || '';
-          if (r.type === 'meal') {
-            desc += ' ' + (mealTypeLabels[r.mealType] || '') + ' ' + (r.content || '').substring(0, 30);
-          } else if (r.type === 'water') {
-            desc += ' ' + (r.amount || 0) + 'ml';
-          } else if (r.type === 'bowel') {
-            desc += ' ' + (bowelLabels[r.bowelType] || '') + ' ' + (r.note || '');
-          } else if (r.type === 'sleep') {
-            desc += ' ' + (r.bedtime || '') + '~' + (r.waketime || '');
-            if (r.duration) desc += ' ' + r.duration.toFixed(1) + 'h';
-          }
-          previewHtml += '<div>' + desc + '</div>';
+          previewHtml += '<div class="preview-date">' + dateLabel + '</div>';
+          previewHtml += '<div>' + r.bedtime + ' ~ ' + r.waketime + ' | ' + r.duration.toFixed(1) + '小时</div>';
           previewHtml += '</div></div>';
         });
       }
       document.getElementById('previewList').innerHTML = previewHtml;
       document.getElementById('previewCard').classList.remove('hidden');
 
-      // Show import button
       if (convertedRecords.length > 0) {
         document.getElementById('importBtn').classList.remove('hidden');
       } else {
@@ -426,125 +438,34 @@
       }
     }
 
-    function convertRecord(src) {
-      var category = src.category;
-      if (!category) return null;
-
-      var base = {
-        id: src.id || Date.now(),
-        date: src.date || '',
-        time: src.time || '',
-        createdAt: src.id ? Date.now() : undefined
-      };
-
-      if (category === 'meal') {
-        base.type = 'meal';
-        base.mealType = src.mealType || 'lunch';
-        if (base.mealType === 'snack') base.mealType = 'dinner'; // map snack to dinner
-        base.cooked = mapCooked(src.selfCooked);
-        base.rating = src.rating || 0;
-        base.content = src.content || '';
-        base.note = src.note || '';
-        base.amount = 0;
-        base.bowelType = 'normal';
-        base.bedtime = '';
-        base.waketime = '';
-        base.duration = 0;
-        return base;
-      }
-
-      if (category === 'coffee') {
-        // Treat coffee/tea as water record
-        base.type = 'water';
-        base.amount = src.amount || 250; // default 250ml per cup
-        base.note = (src.content || src.note || '咖啡/茶').trim();
-        base.content = '';
-        base.rating = 0;
-        base.cooked = 'no';
-        base.mealType = 'lunch';
-        base.bowelType = 'normal';
-        base.bedtime = '';
-        base.waketime = '';
-        base.duration = 0;
-        return base;
-      }
-
-      if (category === 'water') {
-        base.type = 'water';
-        base.amount = src.amount || 0;
-        base.note = src.note || '';
-        base.content = '';
-        base.rating = 0;
-        base.cooked = 'no';
-        base.mealType = 'lunch';
-        base.bowelType = 'normal';
-        base.bedtime = '';
-        base.waketime = '';
-        base.duration = 0;
-        return base;
-      }
-
-      if (category === 'sleep') {
-        base.type = 'sleep';
-        base.bedtime = src.bedTime || src.bedtime || '';
-        base.waketime = src.wakeTime || src.waketime || '';
-        base.rating = src.quality || 0;
-        base.duration = calcDuration(base.bedtime, base.waketime);
-        base.content = '';
-        base.note = src.note || '';
-        base.amount = 0;
-        base.cooked = 'no';
-        base.mealType = 'lunch';
-        base.bowelType = 'normal';
-        return base;
-      }
-
-      if (category === 'bowel') {
-        base.type = 'bowel';
-        var note = src.note || '';
-        base.bowelType = detectBowelType(note);
-        base.note = note;
-        base.content = '';
-        base.rating = 0;
-        base.amount = 0;
-        base.cooked = 'no';
-        base.mealType = 'lunch';
-        base.bedtime = '';
-        base.waketime = '';
-        base.duration = 0;
-        return base;
-      }
-
-      return null;
-    }
-
-    function mapCooked(val) {
-      if (val === 'self') return 'yes';
-      if (val === 'outside') return 'no';
-      if (val === 'mixed') return 'half';
-      return 'no';
-    }
-
-    function detectBowelType(note) {
-      if (!note) return 'normal';
-      if (note.indexOf('稀') !== -1 || note.indexOf('拉稀') !== -1) return 'loose';
-      if (note.indexOf('便秘') !== -1 || note.indexOf('困难') !== -1) return 'constipation';
-      return 'normal';
-    }
-
-    function calcDuration(bedtime, waketime) {
-      if (!bedtime || !waketime) return 0;
+    function parseAppleHealthDate(str) {
+      // Format: "2024-01-15 23:00:00 +0800"
       try {
-        var bp = bedtime.split(':');
-        var wp = waketime.split(':');
-        var bedMin = parseInt(bp[0]) * 60 + parseInt(bp[1]);
-        var wakeMin = parseInt(wp[0]) * 60 + parseInt(wp[1]);
-        var diff = wakeMin - bedMin;
-        if (diff < 0) diff += 24 * 60; // overnight
-        return diff / 60;
+        var match = str.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\s+([+-]\d{4})/);
+        if (!match) return null;
+        var tz = match[7];
+        var tzHour = parseInt(tz.substring(0, 3));
+        var tzMin = parseInt(tz.substring(0, 1) + tz.substring(3, 5));
+        var offset = (tzHour * 60 + tzMin) * 60000;
+        var utc = Date.UTC(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]),
+                           parseInt(match[4]), parseInt(match[5]), parseInt(match[6]));
+        return new Date(utc - offset);
       } catch (e) {
-        return 0;
+        return null;
       }
+    }
+
+    function formatDate(d) {
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
+    function formatTime(d) {
+      var h = String(d.getHours()).padStart(2, '0');
+      var m = String(d.getMinutes()).padStart(2, '0');
+      return h + ':' + m;
     }
 
     function doImport() {
@@ -553,29 +474,24 @@
         return;
       }
 
-      // Load existing health data
       var existing = {};
       try {
         var raw = localStorage.getItem('health_manager');
         if (raw) existing = JSON.parse(raw);
       } catch (e) {}
 
-      // Merge: keep existing records, add new ones
       if (!existing.records) existing.records = [];
       if (!existing.nextId) existing.nextId = 1;
 
-      // Find max existing id
       var maxId = existing.nextId;
       existing.records.forEach(function(r) {
         if (r.id >= maxId) maxId = r.id + 1;
       });
 
-      // Assign new IDs to avoid conflicts
       var importCount = 0;
       convertedRecords.forEach(function(r) {
-        // Check if record with same date+time+type already exists
         var dup = existing.records.some(function(er) {
-          return er.date === r.date && er.time === r.time && er.type === r.type;
+          return er.date === r.date && er.type === 'sleep';
         });
         if (!dup) {
           r.id = maxId++;
@@ -587,11 +503,10 @@
 
       existing.nextId = maxId;
 
-      // Save
       try {
         localStorage.setItem('health_manager', JSON.stringify(existing));
         showMessage('success',
-          '导入成功！共导入 ' + importCount + ' 条记录，跳过重复 ' + (convertedRecords.length - importCount) + ' 条。<br><br>' +
+          '导入成功！共导入 ' + importCount + ' 天睡眠记录。<br><br>' +
           '<a href="wardrobe-manager.html">返回主应用</a>'
         );
         document.getElementById('importBtn').disabled = true;
