@@ -937,6 +937,7 @@
         <div class="filter-chip" data-filter="连衣裙" onclick="setFilter('连衣裙')">连衣裙</div>
         <div class="filter-chip" data-filter="鞋子" onclick="setFilter('鞋子')">鞋子</div>
         <div class="filter-chip" data-filter="配饰" onclick="setFilter('配饰')">配饰</div>
+        <div class="filter-chip" data-filter="搭配" onclick="setFilter('搭配')">搭配</div>
       </div>
       <div id="wardrobeList"></div>
     </div>
@@ -1450,6 +1451,33 @@
       <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn btn-secondary" style="flex:1" onclick="closeImportModal()">取消</button>
         <button class="btn btn-primary" style="flex:1" id="importBtn" onclick="executeImport()" disabled>导入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Preset Outfit (Fixed Combos) -->
+  <div class="modal-overlay" id="presetModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="presetModalTitle">创建固定搭配</div>
+      <input type="hidden" id="presetEditId">
+      <div class="form-group">
+        <label class="form-label">搭配名称</label>
+        <input type="text" class="form-input" id="presetName" placeholder="如：日常通勤、周末休闲">
+      </div>
+      <div class="form-group">
+        <label class="form-label">选择衣物（点击添加）</label>
+        <div id="presetClothingList" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">已选衣物</label>
+        <div id="presetSelectedChips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:32px">
+          <span style="color:var(--muted);font-size:0.82rem">点击上方衣物添加</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closePresetModal()">取消</button>
+        <button class="btn btn-primary" style="flex:1" onclick="savePreset()">保存</button>
       </div>
     </div>
   </div>
