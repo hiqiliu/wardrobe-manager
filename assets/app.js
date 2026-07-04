@@ -1053,6 +1053,9 @@ function renderDiaryHistory() {
         listHtml += (r.duration ? r.duration.toFixed(1) + 'h' : '') + ' ' + (r.bedtime || '') + '~' + (r.waketime || '');
       } else if (r.type === 'drink') {
         listHtml += (drinkTypeNames[r.drinkType] || '饮品') + ' ' + (r.note || '');
+      } else if (r.type === 'workout') {
+        listHtml += (workoutTypeNames[r.workoutType] || '健身') + ' ' + r.duration + 'min';
+        if (r.intensity) listHtml += ' ' + intensityLabels[r.intensity];
       }
       listHtml += '</span></div>';
     });
@@ -1120,6 +1123,8 @@ function viewDiaryDay(dateStr) {
         else if (r.type === 'water') html += (r.amount || 0) + 'ml ' + (r.note || '');
         else if (r.type === 'bowel') html += bowelTypeNames[r.bowelType] + ' ' + (r.note || '');
         else if (r.type === 'sleep') html += (r.duration ? r.duration.toFixed(1) + '小时' : '') + ' (' + (r.bedtime || '') + '~' + (r.waketime || '') + ') ' + (r.rating ? '\u2605'.repeat(r.rating) : '');
+        else if (r.type === 'drink') html += (drinkTypeNames[r.drinkType] || '饮品') + ' ' + (r.note || '');
+        else if (r.type === 'workout') html += (workoutTypeNames[r.workoutType] || '健身') + ' ' + r.duration + 'min' + (r.intensity ? ' | ' + intensityLabels[r.intensity] : '') + (r.content ? ' | ' + r.content.substring(0, 30) : '');
         html += '</span></div>';
       });
       html += '</div>';
@@ -1363,8 +1368,8 @@ function saveHealthData(data) {
 
 var healthData = loadHealthData();
 
-var healthTypeIcons = { meal: '🍽️', water: '💧', bowel: '🚽', sleep: '😴', drink: '☕' };
-var healthTypeNames = { meal: '饮食', water: '饮水', bowel: '排泄', sleep: '睡眠', drink: '饮品' };
+var healthTypeIcons = { meal: '🍽️', water: '💧', bowel: '🚽', sleep: '😴', drink: '☕', workout: '🏋️' };
+var healthTypeNames = { meal: '饮食', water: '饮水', bowel: '排泄', sleep: '睡眠', drink: '饮品', workout: '健身' };
 var mealTypeNames = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
 var bowelTypeNames = { normal: '正常', loose: '偏稀', constipation: '便秘' };
 var cookedNames = { yes: '自己做', no: '外食', half: '一半一半' };
@@ -1385,6 +1390,11 @@ var healthBowelType = 'normal';
 var healthRatingVal = 0;
 var healthSleepRatingVal = 0;
 var healthDrinkType = 'coffee';
+var healthWorkoutType = 'run';
+var healthWorkoutIntensity = 0;
+
+var workoutTypeNames = { run: '跑步', strength: '力量训练', yoga: '瑜伽', walk: '散步', hiit: 'HIIT', swim: '游泳', cycle: '骑行', other: '其他' };
+var intensityLabels = { 1: '轻松', 2: '适中', 3: '吃力', 4: '很累', 5: '极限' };
 
 // Body stats constants (female, born 1995-07-08, height 162cm)
 var BODY_HEIGHT = 162;
@@ -1478,6 +1488,14 @@ function openHealthModal(type) {
     healthDrinkType = 'coffee';
     document.querySelectorAll('.health-drink-type').forEach(function(b) { b.classList.toggle('active', b.dataset.val === 'coffee'); });
     document.getElementById('healthDrinkNote').value = '';
+  } else if (type === 'workout') {
+    healthWorkoutType = 'run';
+    healthWorkoutIntensity = 0;
+    document.querySelectorAll('.health-workout-type').forEach(function(b) { b.classList.toggle('active', b.dataset.val === 'run'); });
+    document.querySelectorAll('#healthFields-workout .mood-option').forEach(function(el) { el.classList.remove('selected'); });
+    document.getElementById('healthWorkoutDuration').value = '30';
+    document.getElementById('healthWorkoutContent').value = '';
+    document.getElementById('healthWorkoutFeel').value = '';
   }
 
   document.getElementById('healthModal').classList.add('active');
@@ -1505,6 +1523,18 @@ function selectBowelType(val) {
 function selectDrinkType(val) {
   healthDrinkType = val;
   document.querySelectorAll('.health-drink-type').forEach(function(b) { b.classList.toggle('active', b.dataset.val === val); });
+}
+
+function selectWorkoutType(val) {
+  healthWorkoutType = val;
+  document.querySelectorAll('.health-workout-type').forEach(function(b) { b.classList.toggle('active', b.dataset.val === val); });
+}
+
+function selectWorkoutIntensity(val) {
+  healthWorkoutIntensity = val;
+  document.querySelectorAll('#healthFields-workout .mood-option').forEach(function(el) {
+    el.classList.toggle('selected', parseInt(el.dataset.intensity) === val);
+  });
 }
 
 function setHealthRating(val) {
@@ -1566,6 +1596,12 @@ function saveHealthRecord() {
   } else if (type === 'drink') {
     record.drinkType = healthDrinkType;
     record.note = document.getElementById('healthDrinkNote').value.trim();
+  } else if (type === 'workout') {
+    record.workoutType = healthWorkoutType;
+    record.duration = parseInt(document.getElementById('healthWorkoutDuration').value) || 0;
+    record.intensity = healthWorkoutIntensity;
+    record.content = document.getElementById('healthWorkoutContent').value.trim();
+    record.feel = document.getElementById('healthWorkoutFeel').value.trim();
   }
 
   healthData.records.push(record);
@@ -1606,7 +1642,7 @@ function renderHealthPage() {
     html = '<div style="text-align:center;color:var(--muted);font-size:0.85rem;padding:8px">今天还没有健康记录，点击上方快速添加</div>';
   } else {
     todayRecords.forEach(function(r) {
-      var bgColors = { meal: '#fef3c7', water: '#dbeafe', bowel: '#d1fae5', sleep: '#ede9fe' };
+      var bgColors = { meal: '#fef3c7', water: '#dbeafe', bowel: '#d1fae5', sleep: '#ede9fe', drink: '#fce7f3', workout: '#e0f2fe' };
       html += '<div class="health-record">';
       html += '<div class="health-record-icon" style="background:' + bgColors[r.type] + '">' + healthTypeIcons[r.type] + '</div>';
       html += '<div class="health-record-info">';
@@ -1628,6 +1664,10 @@ function renderHealthPage() {
       } else if (r.type === 'drink') {
         html += (drinkTypeNames[r.drinkType] || '饮品');
         if (r.note) html += ' | ' + r.note;
+      } else if (r.type === 'workout') {
+        html += (workoutTypeNames[r.workoutType] || '健身') + ' ' + r.duration + 'min';
+        if (r.intensity) html += ' | ' + intensityLabels[r.intensity];
+        if (r.content) html += ' | ' + r.content.substring(0, 25);
       }
       html += '</div>';
       html += '</div>';
@@ -1831,6 +1871,288 @@ switchPage = function(name) {
   if (name === 'diary-history') { diaryHistDate = new Date(); renderDiaryHistory(); }
   if (name === 'diary-analysis') renderDiaryAnalysis();
 };
+
+// === Import Data ===
+var importParsedRecords = [];
+
+function openImportModal() {
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importPreview').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:0.85rem;padding:12px">选择 JSON 备份文件后预览</div>';
+  document.getElementById('importBtn').disabled = true;
+  importParsedRecords = [];
+  document.getElementById('importModal').classList.add('active');
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var fileInput = document.getElementById('importFileInput');
+  if (fileInput) {
+    fileInput.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var data = JSON.parse(ev.target.result);
+          var sources = [];
+          if (data.food && Array.isArray(data.food.meals)) {
+            sources = sources.concat(data.food.meals);
+          }
+          if (data.dailyRecords && Array.isArray(data.dailyRecords.records)) {
+            sources = sources.concat(data.dailyRecords.records);
+          }
+          var records = [];
+          sources.forEach(function(src) {
+            var r = convertImportRecord(src);
+            if (r) records.push(r);
+          });
+          importParsedRecords = records;
+          renderImportPreview(records);
+          document.getElementById('importBtn').disabled = records.length === 0;
+        } catch (err) {
+          document.getElementById('importPreview').innerHTML = '<div style="color:var(--danger);text-align:center;padding:12px">文件解析失败: ' + err.message + '</div>';
+          importParsedRecords = [];
+          document.getElementById('importBtn').disabled = true;
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+});
+
+function convertImportRecord(src) {
+  var category = src.category;
+  if (!category) return null;
+  var base = {
+    id: Date.now() + Math.random() * 1000,
+    date: src.date || '',
+    time: src.time || '',
+    createdAt: Date.now()
+  };
+  if (category === 'meal' || category === 'snack') {
+    base.type = 'meal';
+    base.mealType = src.mealType || (category === 'snack' ? 'snack' : 'lunch');
+    var cooked = src.selfCooked;
+    base.cooked = cooked === 'self' ? 'yes' : (cooked === 'outside' ? 'no' : (cooked === 'mixed' ? 'half' : 'yes'));
+    base.rating = src.rating || 0;
+    base.content = src.content || '';
+    base.note = '';
+    return base;
+  }
+  if (category === 'coffee') {
+    base.type = 'drink';
+    base.drinkType = 'coffee';
+    base.note = src.content || src.note || '咖啡/茶';
+    base.amount = 0;
+    return base;
+  }
+  if (category === 'water') {
+    base.type = 'water';
+    base.amount = src.amount || 0;
+    base.note = src.note || '';
+    return base;
+  }
+  if (category === 'sleep') {
+    base.type = 'sleep';
+    base.bedtime = src.bedTime || src.bedtime || '';
+    base.waketime = src.wakeTime || src.waketime || '';
+    base.rating = src.quality || 0;
+    if (base.bedtime && base.waketime) {
+      var bp = base.bedtime.split(':');
+      var wp = base.waketime.split(':');
+      var bm = parseInt(bp[0]) * 60 + parseInt(bp[1]);
+      var wm = parseInt(wp[0]) * 60 + parseInt(wp[1]);
+      base.duration = wm >= bm ? (wm - bm) / 60 : (wm - bm + 1440) / 60;
+    } else {
+      base.duration = 0;
+    }
+    base.note = src.note || '';
+    return base;
+  }
+  if (category === 'bowel') {
+    base.type = 'bowel';
+    var note = src.note || '';
+    base.bowelType = (note.indexOf('稀') !== -1 || note.indexOf('拉稀') !== -1) ? 'loose' : ((note.indexOf('便秘') !== -1 || note.indexOf('困难') !== -1) ? 'constipation' : 'normal');
+    base.note = note;
+    return base;
+  }
+  if (category === 'exercise') {
+    base.type = 'workout';
+    base.workoutType = 'other';
+    base.duration = src.duration || 30;
+    base.intensity = 0;
+    base.content = src.content || '';
+    base.feel = src.note || '';
+    base.note = '';
+    return base;
+  }
+  return null;
+}
+
+function renderImportPreview(records) {
+  var counts = { meal: 0, drink: 0, water: 0, sleep: 0, bowel: 0, workout: 0 };
+  var names = { meal: '饮食', drink: '饮品', water: '饮水', sleep: '睡眠', bowel: '排泄', workout: '健身' };
+  records.forEach(function(r) {
+    if (counts[r.type] !== undefined) counts[r.type]++;
+  });
+  var html = '<div style="margin-bottom:12px;padding:10px;background:var(--bg2);border-radius:8px">';
+  html += '<div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">解析到 ' + records.length + ' 条记录</div>';
+  Object.keys(counts).forEach(function(t) {
+    if (counts[t] > 0) {
+      html += '<span class="diary-tag" style="margin:2px">' + names[t] + ' ' + counts[t] + '</span>';
+    }
+  });
+  html += '</div>';
+  if (records.length > 0) {
+    html += '<div style="font-size:0.75rem;color:var(--muted)">日期范围: ' + records[records.length - 1].date + ' ~ ' + records[0].date + '</div>';
+  }
+  document.getElementById('importPreview').innerHTML = html;
+}
+
+function executeImport() {
+  if (importParsedRecords.length === 0) return;
+  var added = 0;
+  var skipped = 0;
+  importParsedRecords.forEach(function(rec) {
+    var exists = healthData.records.some(function(r) {
+      return r.date === rec.date && r.type === rec.type && r.time === rec.time;
+    });
+    if (!exists) {
+      healthData.records.push(rec);
+      added++;
+    } else {
+      skipped++;
+    }
+  });
+  saveHealthData(healthData);
+  closeImportModal();
+  renderHealthPage();
+  showToast('导入完成: 新增' + added + '条' + (skipped > 0 ? ', 跳过' + skipped + '条重复' : ''));
+}
+
+// === Export & Sync ===
+function exportAllData() {
+  var data = {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+    clothes: appData.clothes,
+    records: appData.records,
+    diaries: diaryData.diaries,
+    health: healthData.records,
+    bodyStats: bodyData.records,
+    nextIds: {
+      clothes: appData.nextId,
+      records: appData.nextRecordId,
+      diaries: diaryData.nextId,
+      health: healthData.nextId,
+      bodyStats: bodyData.nextId
+    }
+  };
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'my-space-backup-' + todayStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('数据已导出');
+}
+
+function importAllData() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (!data.version && !data.clothes) {
+          showToast('不是有效的备份文件');
+          return;
+        }
+        var counts = { clothes: 0, records: 0, diaries: 0, health: 0, body: 0 };
+
+        if (data.clothes && Array.isArray(data.clothes)) {
+          data.clothes.forEach(function(item) {
+            var exists = appData.clothes.some(function(c) { return c.id === item.id; });
+            if (!exists) {
+              appData.clothes.push(item);
+              if (item.id >= appData.nextId) appData.nextId = item.id + 1;
+              counts.clothes++;
+            }
+          });
+          saveData(appData);
+        }
+
+        if (data.records && Array.isArray(data.records)) {
+          data.records.forEach(function(item) {
+            var exists = appData.records.some(function(c) { return c.date === item.date && JSON.stringify(c.clothingIds) === JSON.stringify(item.clothingIds); });
+            if (!exists) {
+              appData.records.push(item);
+              if (item.id >= appData.nextRecordId) appData.nextRecordId = item.id + 1;
+              counts.records++;
+            }
+          });
+          saveData(appData);
+        }
+
+        if (data.diaries && Array.isArray(data.diaries)) {
+          data.diaries.forEach(function(item) {
+            var exists = diaryData.diaries.some(function(d) { return d.date === item.date; });
+            if (!exists) {
+              diaryData.diaries.push(item);
+              if (item.id >= diaryData.nextId) diaryData.nextId = item.id + 1;
+              counts.diaries++;
+            }
+          });
+          saveDiaryData(diaryData);
+        }
+
+        if (data.health && Array.isArray(data.health)) {
+          data.health.forEach(function(item) {
+            var exists = healthData.records.some(function(r) { return r.date === item.date && r.type === item.type && r.time === item.time; });
+            if (!exists) {
+              healthData.records.push(item);
+              if (item.id >= healthData.nextId) healthData.nextId = item.id + 1;
+              counts.health++;
+            }
+          });
+          saveHealthData(healthData);
+        }
+
+        if (data.bodyStats && Array.isArray(data.bodyStats)) {
+          data.bodyStats.forEach(function(item) {
+            var exists = bodyData.records.some(function(r) { return r.date === item.date && r.weight === item.weight; });
+            if (!exists) {
+              bodyData.records.push(item);
+              if (item.id >= bodyData.nextId) bodyData.nextId = item.id + 1;
+              counts.body++;
+            }
+          });
+          saveBodyData(bodyData);
+        }
+
+        var total = counts.clothes + counts.records + counts.diaries + counts.health + counts.body;
+        showToast('同步完成: 新增 ' + total + ' 条数据');
+        renderHome();
+        renderHealthPage();
+      } catch (err) {
+        showToast('文件解析失败');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
 
 // === Init ===
 updateHeaderDate();
