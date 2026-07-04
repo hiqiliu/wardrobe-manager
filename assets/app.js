@@ -889,7 +889,7 @@ function selectMood(val) {
 
 // === Diary CRUD ===
 function saveDiary() {
-  var date = todayStr();
+  var date = document.getElementById('diaryDate').value || todayStr();
   var event = document.getElementById('diaryEvent').value.trim();
   var thought = document.getElementById('diaryThought').value.trim();
   var tagsStr = document.getElementById('diaryTags').value.trim();
@@ -905,7 +905,7 @@ function saveDiary() {
     existing.mood = selectedMood || existing.mood;
     existing.event = event || existing.event;
     existing.thought = thought || existing.thought;
-    if (tags.length > 0) existing.tags = tags;
+    existing.tags = tags;
     existing.updatedAt = Date.now();
   } else {
     diaryData.diaries.push({
@@ -924,10 +924,42 @@ function saveDiary() {
   renderDiaryPage();
 }
 
+function editTodayDiary() {
+  var entry = getDiaryForDate(todayStr());
+  if (!entry) return;
+  document.getElementById('diaryDate').value = entry.date;
+  document.getElementById('diaryEvent').value = entry.event || '';
+  document.getElementById('diaryThought').value = entry.thought || '';
+  document.getElementById('diaryTags').value = (entry.tags || []).join(' ');
+  selectedMood = entry.mood || 0;
+  document.querySelectorAll('.mood-option').forEach(function(el) { el.classList.toggle('selected', parseInt(el.dataset.mood) === selectedMood); });
+  document.getElementById('diaryMoodCard').style.display = '';
+  window.scrollTo({ top: document.getElementById('diaryMoodCard').offsetTop - 80, behavior: 'smooth' });
+}
+
+function deleteTodayDiary() {
+  var entry = getDiaryForDate(todayStr());
+  if (!entry) return;
+  if (!confirm('确定要删除今天的日记吗？')) return;
+  diaryData.diaries = diaryData.diaries.filter(function(d) { return d.date !== todayStr(); });
+  saveDiaryData(diaryData);
+  renderDiaryPage();
+  showToast('已删除');
+}
+
 // === Render Diary Page ===
 function renderDiaryPage() {
   var date = todayStr();
   var entry = getDiaryForDate(date);
+
+  // Date input default
+  document.getElementById('diaryDate').value = date;
+
+  // Show/hide edit/delete buttons
+  var actionsEl = document.getElementById('diaryTodayActions');
+  if (actionsEl) {
+    actionsEl.style.display = entry ? '' : 'none';
+  }
 
   // Mood
   if (entry && entry.mood > 0) {
