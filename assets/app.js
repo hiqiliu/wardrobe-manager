@@ -14,6 +14,9 @@ function saveData(data) {
 }
 
 var appData = loadData();
+// Ensure presets array exists (backward compat)
+if (!appData.presets) appData.presets = [];
+if (!appData.nextPresetId) appData.nextPresetId = 1;
 
 // === Utility ===
 function todayStr() {
