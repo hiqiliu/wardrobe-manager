@@ -42,6 +42,10 @@ function getRecordForDate(dateStr) {
   return appData.records.find(function(r) { return r.date === dateStr; });
 }
 
+function getRecordsForDate(dateStr) {
+  return appData.records.filter(function(r) { return r.date === dateStr; });
+}
+
 function getClothingWearCount(clothId) {
   var count = 0;
   appData.records.forEach(function(r) {
@@ -229,17 +233,25 @@ function saveRating() {
 
 // === Outfit Record ===
 var outfitSelectedIds = [];
+var editingOutfitId = null;
 
-function openOutfitModal(dateStr) {
+function openOutfitModal(dateStr, recordId) {
   document.getElementById('outfitDate').value = dateStr || todayStr();
   outfitSelectedIds = [];
-  var existing = getRecordForDate(dateStr || todayStr());
-  if (existing) {
-    outfitSelectedIds = existing.clothingIds.slice();
-    document.getElementById('outfitNote').value = existing.note || '';
+  editingOutfitId = recordId || null;
+
+  if (recordId) {
+    var record = appData.records.find(function(r) { return r.id === recordId; });
+    if (record) {
+      outfitSelectedIds = record.clothingIds.slice();
+      document.getElementById('outfitNote').value = record.note || '';
+      document.getElementById('outfitModalTitle').textContent = '编辑穿搭';
+    }
   } else {
     document.getElementById('outfitNote').value = '';
+    document.getElementById('outfitModalTitle').textContent = '记录穿搭';
   }
+
   renderOutfitSelectList();
   document.getElementById('outfitModal').classList.add('active');
 }
@@ -304,10 +316,13 @@ function saveOutfit() {
     return;
   }
 
-  var existing = appData.records.find(function(r) { return r.date === date; });
-  if (existing) {
-    existing.clothingIds = outfitSelectedIds.slice();
-    existing.note = note;
+  if (editingOutfitId) {
+    var record = appData.records.find(function(r) { return r.id === editingOutfitId; });
+    if (record) {
+      record.date = date;
+      record.clothingIds = outfitSelectedIds.slice();
+      record.note = note;
+    }
   } else {
     appData.records.push({
       id: appData.nextRecordId++,
@@ -324,18 +339,29 @@ function saveOutfit() {
   renderCalendar();
 }
 
-function removeClothingFromRecord(dateStr, clothId) {
-  var record = appData.records.find(function(r) { return r.date === dateStr; });
+function removeClothingFromRecord(recordId, clothId) {
+  var record = appData.records.find(function(r) { return r.id === recordId; });
   if (!record) return;
   record.clothingIds = record.clothingIds.filter(function(id) { return id !== clothId; });
   if (record.clothingIds.length === 0) {
-    appData.records = appData.records.filter(function(r) { return r.date !== dateStr; });
+    appData.records = appData.records.filter(function(r) { return r.id !== recordId; });
   }
   saveData(appData);
   renderHome();
   renderCalendar();
-  renderSelectedDay(dateStr);
+  renderSelectedDay(record.date);
   showToast('已移除');
+}
+
+function deleteOutfitRecord(recordId) {
+  var record = appData.records.find(function(r) { return r.id === recordId; });
+  var date = record ? record.date : '';
+  appData.records = appData.records.filter(function(r) { return r.id !== recordId; });
+  saveData(appData);
+  renderHome();
+  renderCalendar();
+  if (date) renderSelectedDay(date);
+  showToast('已删除');
 }
 
 // === Render Home ===
@@ -362,20 +388,34 @@ function renderHome() {
 
   // Today outfit
   var today = todayStr();
-  var record = getRecordForDate(today);
+  var todayRecords = getRecordsForDate(today);
   var todayHtml = '';
-  if (record && record.clothingIds.length > 0) {
-    todayHtml = '<div class="daily-outfit">';
-    record.clothingIds.forEach(function(cid) {
-      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
-      if (c) {
-        todayHtml += '<span class="outfit-chip">' + categoryIcons[c.category] + ' ' + c.name + '</span>';
+
+  if (todayRecords.length > 0) {
+    todayRecords.forEach(function(record, idx) {
+      todayHtml += '<div style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:10px">';
+      todayHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      todayHtml += '<span style="font-size:0.75rem;font-weight:600;color:var(--muted)">穿搭 ' + (idx + 1) + '</span>';
+      todayHtml += '<div style="display:flex;gap:4px">';
+      todayHtml += '<button class="btn btn-small btn-outline" onclick="openOutfitModal(\'' + today + '\',' + record.id + ')">编辑</button>';
+      todayHtml += '<button class="btn btn-small btn-outline" onclick="deleteOutfitRecord(' + record.id + ')" style="color:var(--danger)">删除</button>';
+      todayHtml += '</div></div>';
+      todayHtml += '<div class="daily-outfit">';
+      record.clothingIds.forEach(function(cid) {
+        var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+        if (c) {
+          todayHtml += '<span class="outfit-chip">' + categoryIcons[c.category] + ' ' + c.name + '</span>';
+        }
+      });
+      todayHtml += '</div>';
+      if (record.note) {
+        todayHtml += '<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">💭 ' + record.note + '</div>';
       }
+      todayHtml += '</div>';
     });
+    todayHtml += '<div style="text-align:center;margin-top:8px">';
+    todayHtml += '<button class="btn btn-small btn-primary" onclick="openOutfitModal(\'' + today + '\')">+ 添加新穿搭</button>';
     todayHtml += '</div>';
-    if (record.note) {
-      todayHtml += '<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">💭 ' + record.note + '</div>';
-    }
   } else {
     todayHtml = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.85rem">';
     todayHtml += '今天还没有记录<br><button class="btn btn-small btn-primary" style="margin-top:8px" onclick="openOutfitModal(\'' + today + '\')">记录穿搭</button>';
@@ -634,25 +674,35 @@ function selectDay(dateStr) {
 }
 
 function renderSelectedDay(dateStr) {
-  var record = getRecordForDate(dateStr);
+  var records = getRecordsForDate(dateStr);
   var html = '';
 
-  if (record && record.clothingIds.length > 0) {
-    html += '<div class="daily-outfit">';
-    record.clothingIds.forEach(function(cid) {
-      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
-      if (c) {
-        html += '<span class="outfit-chip">' + categoryIcons[c.category] + ' ' + c.name;
-        html += ' <span class="remove-outfit" onclick="removeClothingFromRecord(\'' + dateStr + '\',' + cid + ')">×</span>';
-        html += '</span>';
+  if (records.length > 0) {
+    records.forEach(function(record, idx) {
+      html += '<div style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:10px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      html += '<span style="font-size:0.75rem;font-weight:600;color:var(--muted)">穿搭 ' + (idx + 1) + '</span>';
+      html += '<div style="display:flex;gap:4px">';
+      html += '<button class="btn btn-small btn-outline" onclick="openOutfitModal(\'' + dateStr + '\',' + record.id + ')">编辑</button>';
+      html += '<button class="btn btn-small btn-outline" onclick="deleteOutfitRecord(' + record.id + ')" style="color:var(--danger)">删除</button>';
+      html += '</div></div>';
+      html += '<div class="daily-outfit">';
+      record.clothingIds.forEach(function(cid) {
+        var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+        if (c) {
+          html += '<span class="outfit-chip">' + categoryIcons[c.category] + ' ' + c.name;
+          html += ' <span class="remove-outfit" onclick="removeClothingFromRecord(' + record.id + ',' + cid + ')">×</span>';
+          html += '</span>';
+        }
+      });
+      html += '</div>';
+      if (record.note) {
+        html += '<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">💭 ' + record.note + '</div>';
       }
+      html += '</div>';
     });
-    html += '</div>';
-    if (record.note) {
-      html += '<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">💭 ' + record.note + '</div>';
-    }
-    html += '<div style="margin-top:12px;display:flex;gap:8px">';
-    html += '<button class="btn btn-small btn-secondary" onclick="openOutfitModal(\'' + dateStr + '\')">编辑</button>';
+    html += '<div style="text-align:center;margin-top:8px">';
+    html += '<button class="btn btn-small btn-primary" onclick="openOutfitModal(\'' + dateStr + '\')">+ 添加新穿搭</button>';
     html += '</div>';
   } else {
     html = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.85rem">';
