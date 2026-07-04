@@ -1297,12 +1297,16 @@
     </div>
   </div>
 
-  <!-- Modal: Add Outfit Record -->
+  <!-- Modal: Add/Edit Outfit Record -->
   <div class="modal-overlay" id="outfitModal">
     <div class="modal">
       <div class="modal-handle"></div>
-      <div class="modal-title">记录今日穿搭</div>
-      <input type="hidden" id="outfitDate">
+      <div class="modal-title" id="outfitModalTitle">记录穿搭</div>
+      <input type="hidden" id="outfitEditId">
+      <div class="form-group">
+        <label class="form-label">日期</label>
+        <input type="date" class="form-input" id="outfitDate">
+      </div>
       <div class="form-group">
         <label class="form-label">选择穿过的衣物 (可多选)</label>
         <div class="search-bar" style="margin-bottom:8px">
