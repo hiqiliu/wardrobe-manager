@@ -65,11 +65,11 @@ function getDatesWithRecords() {
 
 var categoryColors = {
   '上装': '#c4856c', '下装': '#7a9e7e', '外套': '#6b8fb5',
-  '连衣裙': '#c46bae', '鞋子': '#8a8580', '配饰': '#d4a55a'
+  '连衣裙': '#c46bae', '鞋子': '#8a8580', '配饰': '#d4a55a', '内衣': '#b88fc4'
 };
 
 var categoryIcons = {
-  '上装': '👕', '下装': '👖', '外套': '🧥', '连衣裙': '👗', '鞋子': '👟', '配饰': '💎'
+  '上装': '👕', '下装': '👖', '外套': '🧥', '连衣裙': '👗', '鞋子': '👟', '配饰': '💎', '内衣': '🩱'
 };
 
 var seasonTags = { '春': 'tag-green', '夏': 'tag-amber', '秋': 'tag-red', '冬': 'tag-blue', '四季': 'tag-gray' };
@@ -795,7 +795,7 @@ function renderWardrobe() {
       return true;
     });
 
-    var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰'];
+    var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰', '内衣'];
     list.sort(function(a, b) {
       var ai = catOrder.indexOf(a.category);
       var bi = catOrder.indexOf(b.category);
