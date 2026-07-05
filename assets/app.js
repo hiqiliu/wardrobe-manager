@@ -111,6 +111,7 @@ function openAddClothingModal() {
   document.getElementById('clothSeason').value = '夏';
   document.getElementById('clothPrice').value = '';
   document.getElementById('clothChannel').value = '直播间';
+  document.getElementById('clothBrand').value = '';
   document.getElementById('clothDate').value = todayStr();
   document.getElementById('clothNote').value = '';
   document.getElementById('clothingModal').classList.add('active');
@@ -126,6 +127,7 @@ function openEditClothingModal(id) {
   document.getElementById('clothSeason').value = item.season;
   document.getElementById('clothPrice').value = item.price || '';
   document.getElementById('clothChannel').value = item.channel;
+  document.getElementById('clothBrand').value = item.brand || '';
   document.getElementById('clothDate').value = item.purchaseDate || '';
   document.getElementById('clothNote').value = item.note || '';
   document.getElementById('clothingModal').classList.add('active');
@@ -146,6 +148,7 @@ function saveClothing() {
     season: document.getElementById('clothSeason').value,
     price: parseFloat(document.getElementById('clothPrice').value) || 0,
     channel: document.getElementById('clothChannel').value,
+    brand: document.getElementById('clothBrand').value.trim(),
     purchaseDate: document.getElementById('clothDate').value,
     note: document.getElementById('clothNote').value.trim(),
     rating: 0,
@@ -848,6 +851,7 @@ function renderWardrobe() {
       html += '<span class="tag ' + (seasonTags[c.season] || 'tag-gray') + '">' + c.season + '</span>';
       if (c.price) html += '<span class="tag tag-gray">¥' + c.price + '</span>';
       if (c.channel) html += '<span class="tag tag-gray">' + c.channel + '</span>';
+      if (c.brand) html += '<span class="tag tag-gray">' + escapeHtml(c.brand) + '</span>';
       html += '</div>';
       html += '<div style="display:flex;gap:12px;margin-top:6px;font-size:0.75rem;color:var(--muted)">';
       html += '<span>穿过 ' + wearCount + ' 次</span>';
