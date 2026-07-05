@@ -194,6 +194,18 @@ function closeConfirmModal() {
   document.getElementById('confirmModal').classList.remove('active');
 }
 
+function duplicateClothing(id) {
+  var item = appData.clothes.find(function(c) { return c.id === id; });
+  if (!item) return;
+  var copy = JSON.parse(JSON.stringify(item));
+  copy.id = appData.nextId++;
+  copy.name = item.name + ' (副本)';
+  appData.clothes.push(copy);
+  saveData(appData);
+  renderWardrobe();
+  showToast('已复制');
+}
+
 // === Rating ===
 var currentRating = 0;
 
@@ -841,6 +853,7 @@ function renderWardrobe() {
       html += '</div>';
       html += '<div class="clothing-actions">';
       html += '<button class="btn btn-small btn-outline" onclick="openRateModal(' + c.id + ')" title="评分">⭐</button>';
+      html += '<button class="btn btn-small btn-outline" onclick="duplicateClothing(' + c.id + ')" title="复制">📋</button>';
       html += '<button class="btn btn-small btn-outline" onclick="openEditClothingModal(' + c.id + ')" title="编辑">✏️</button>';
       html += '<button class="btn btn-small btn-outline" onclick="deleteClothing(' + c.id + ')" title="删除" style="color:var(--danger)">🗑</button>';
       html += '</div>';
