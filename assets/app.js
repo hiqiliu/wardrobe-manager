@@ -238,15 +238,20 @@ function saveRating() {
 var outfitSelectedIds = [];
 var editingOutfitId = null;
 
+var outfitImageBase64 = '';
+
 function openOutfitModal(dateStr, recordId) {
   document.getElementById('outfitDate').value = dateStr || todayStr();
   outfitSelectedIds = [];
+  outfitImageBase64 = '';
   editingOutfitId = recordId || null;
+  document.getElementById('outfitImageInput').value = '';
 
   if (recordId) {
     var record = appData.records.find(function(r) { return r.id === recordId; });
     if (record) {
       outfitSelectedIds = record.clothingIds.slice();
+      outfitImageBase64 = record.image || '';
       document.getElementById('outfitNote').value = record.note || '';
       document.getElementById('outfitModalTitle').textContent = '编辑穿搭';
     }
@@ -255,8 +260,40 @@ function openOutfitModal(dateStr, recordId) {
     document.getElementById('outfitModalTitle').textContent = '记录穿搭';
   }
 
+  renderOutfitImagePreview();
   renderOutfitSelectList();
   document.getElementById('outfitModal').classList.add('active');
+}
+
+function handleOutfitImage(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('图片太大，请选择小于2MB的照片');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    outfitImageBase64 = e.target.result;
+    renderOutfitImagePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderOutfitImagePreview() {
+  var el = document.getElementById('outfitImagePreview');
+  if (outfitImageBase64) {
+    el.innerHTML = '<div style="position:relative;width:100%">' +
+      '<img src="' + outfitImageBase64 + '" style="width:100%;height:160px;object-fit:cover;border-radius:8px">' +
+      '<button onclick="outfitImageBase64=\'\';renderOutfitImagePreview();" class="btn btn-small btn-outline" style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,0.9)">🗑</button>' +
+      '</div>';
+  } else {
+    el.innerHTML = '<div onclick="document.getElementById(\'outfitImageInput\').click()" style="width:100%;height:120px;border:2px dashed var(--rule);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2)">' +
+      '<span style="font-size:1.5rem">📷</span>' +
+      '<span style="font-size:0.78rem;color:var(--muted)">点击添加照片</span>' +
+      '</div>';
+  }
 }
 
 function closeOutfitModal() {
@@ -325,14 +362,18 @@ function saveOutfit() {
       record.date = date;
       record.clothingIds = outfitSelectedIds.slice();
       record.note = note;
+      if (outfitImageBase64) record.image = outfitImageBase64;
+      else delete record.image;
     }
   } else {
-    appData.records.push({
+    var newRecord = {
       id: appData.nextRecordId++,
       date: date,
       clothingIds: outfitSelectedIds.slice(),
       note: note
-    });
+    };
+    if (outfitImageBase64) newRecord.image = outfitImageBase64;
+    appData.records.push(newRecord);
   }
 
   saveData(appData);
@@ -403,6 +444,9 @@ function renderHome() {
       todayHtml += '<button class="btn btn-small btn-outline" onclick="openOutfitModal(\'' + today + '\',' + record.id + ')">编辑</button>';
       todayHtml += '<button class="btn btn-small btn-outline" onclick="deleteOutfitRecord(' + record.id + ')" style="color:var(--danger)">删除</button>';
       todayHtml += '</div></div>';
+      if (record.image) {
+        todayHtml += '<img src="' + record.image + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px">';
+      }
       todayHtml += '<div class="daily-outfit">';
       record.clothingIds.forEach(function(cid) {
         var c = appData.clothes.find(function(cl) { return cl.id === cid; });
@@ -554,19 +598,23 @@ function setFilter(val) {
 // === Preset Outfits (Fixed Combos) ===
 var presetSelectedIds = [];
 var editingPresetId = null;
+var presetImageBase64 = '';
 
 function openPresetModal(presetId) {
   presetSelectedIds = [];
   editingPresetId = presetId || null;
+  presetImageBase64 = '';
 
   document.getElementById('presetName').value = '';
   document.getElementById('presetEditId').value = '';
+  document.getElementById('presetImageInput').value = '';
 
   if (presetId) {
     var preset = appData.presets.find(function(p) { return p.id === presetId; });
     if (preset) {
       document.getElementById('presetName').value = preset.name || '';
       presetSelectedIds = preset.clothingIds.slice();
+      presetImageBase64 = preset.image || '';
       document.getElementById('presetEditId').value = presetId;
       document.getElementById('presetModalTitle').textContent = '编辑固定搭配';
     }
@@ -574,9 +622,41 @@ function openPresetModal(presetId) {
     document.getElementById('presetModalTitle').textContent = '创建固定搭配';
   }
 
+  renderPresetImagePreview();
   renderPresetClothingList();
   renderPresetSelectedChips();
   document.getElementById('presetModal').classList.add('active');
+}
+
+function handlePresetImage(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('图片太大，请选择小于2MB的照片');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    presetImageBase64 = e.target.result;
+    renderPresetImagePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderPresetImagePreview() {
+  var el = document.getElementById('presetImagePreview');
+  if (presetImageBase64) {
+    el.innerHTML = '<div style="position:relative;width:100%">' +
+      '<img src="' + presetImageBase64 + '" style="width:100%;height:160px;object-fit:cover;border-radius:8px">' +
+      '<button onclick="presetImageBase64=\'\';renderPresetImagePreview();" class="btn btn-small btn-outline" style="position:absolute;top:6px;right:6px;background:rgba(255,255,255,0.9)">🗑</button>' +
+      '</div>';
+  } else {
+    el.innerHTML = '<div onclick="document.getElementById(\'presetImageInput\').click()" style="width:100%;height:120px;border:2px dashed var(--rule);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2)">' +
+      '<span style="font-size:1.5rem">📷</span>' +
+      '<span style="font-size:0.78rem;color:var(--muted)">点击添加照片</span>' +
+      '</div>';
+  }
 }
 
 function closePresetModal() {
@@ -638,13 +718,17 @@ function savePreset() {
     if (preset) {
       preset.name = name;
       preset.clothingIds = presetSelectedIds.slice();
+      if (presetImageBase64) preset.image = presetImageBase64;
+      else delete preset.image;
     }
   } else {
-    appData.presets.push({
+    var newPreset = {
       id: appData.nextPresetId++,
       name: name,
       clothingIds: presetSelectedIds.slice()
-    });
+    };
+    if (presetImageBase64) newPreset.image = presetImageBase64;
+    appData.presets.push(newPreset);
   }
 
   saveData(appData);
@@ -665,9 +749,11 @@ function usePreset(presetId) {
   var preset = appData.presets.find(function(p) { return p.id === presetId; });
   if (!preset) return;
   outfitSelectedIds = preset.clothingIds.slice();
+  outfitImageBase64 = preset.image || '';
   editingOutfitId = null;
   document.getElementById('outfitDate').value = todayStr();
   document.getElementById('outfitNote').value = '';
+  renderOutfitImagePreview();
   renderOutfitSelectList();
   document.getElementById('outfitModal').classList.add('active');
 }
@@ -786,7 +872,11 @@ function renderPresetCards(presets, search) {
 
   filtered.forEach(function(preset) {
     html += '<div class="clothing-item">';
-    html += '<div class="clothing-color" style="background:var(--accent)"></div>';
+    if (preset.image) {
+      html += '<img src="' + preset.image + '" style="width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0">';
+    } else {
+      html += '<div class="clothing-color" style="background:var(--accent)"></div>';
+    }
     html += '<div class="clothing-info">';
     html += '<div class="clothing-name">' + escapeHtml(preset.name) + '</div>';
     html += '<div class="clothing-meta">';
@@ -886,6 +976,9 @@ function renderSelectedDay(dateStr) {
       html += '<button class="btn btn-small btn-outline" onclick="openOutfitModal(\'' + dateStr + '\',' + record.id + ')">编辑</button>';
       html += '<button class="btn btn-small btn-outline" onclick="deleteOutfitRecord(' + record.id + ')" style="color:var(--danger)">删除</button>';
       html += '</div></div>';
+      if (record.image) {
+        html += '<img src="' + record.image + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px">';
+      }
       html += '<div class="daily-outfit">';
       record.clothingIds.forEach(function(cid) {
         var c = appData.clothes.find(function(cl) { return cl.id === cid; });
