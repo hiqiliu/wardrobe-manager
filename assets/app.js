@@ -2319,20 +2319,46 @@ function executeImport() {
 function exportAllData() {
   var data = {
     exportedAt: new Date().toISOString(),
-    version: 1,
-    clothes: appData.clothes,
-    records: appData.records,
-    diaries: diaryData.diaries,
-    health: healthData.records,
-    bodyStats: bodyData.records,
+    version: 2,
+    clothes: appData.clothes || [],
+    records: appData.records || [],
+    presets: appData.presets || [],
+    diaries: diaryData.diaries || [],
+    health: healthData.records || [],
+    bodyStats: bodyData.records || [],
     nextIds: {
-      clothes: appData.nextId,
-      records: appData.nextRecordId,
-      diaries: diaryData.nextId,
-      health: healthData.nextId,
-      bodyStats: bodyData.nextId
+      clothes: appData.nextId || 1,
+      records: appData.nextRecordId || 1,
+      presets: appData.nextPresetId || 1,
+      diaries: diaryData.nextId || 1,
+      health: healthData.nextId || 1,
+      bodyStats: bodyData.nextId || 1
     }
   };
+
+  // Show summary before exporting
+  var counts = {
+    '衣橱': data.clothes.length,
+    '穿搭': data.records.length,
+    '固定搭配': data.presets.length,
+    '日记': data.diaries.length,
+    '健康': data.health.length,
+    '身体数据': data.bodyStats.length
+  };
+  var summary = '即将导出：\n';
+  var total = 0;
+  Object.keys(counts).forEach(function(k) {
+    if (counts[k] > 0) {
+      summary += k + ': ' + counts[k] + '条\n';
+      total += counts[k];
+    }
+  });
+  summary += '\n共 ' + total + ' 条数据';
+  if (total === 0) {
+    summary += '\n\n⚠️ 当前浏览器没有找到数据！\n如果你在别的设备上录入的数据，请在那台设备上导出。';
+  }
+  if (!confirm(summary + '\n\n确认导出？')) return;
+
   var json = JSON.stringify(data, null, 2);
   var blob = new Blob([json], { type: 'application/json' });
   var url = URL.createObjectURL(blob);
@@ -2357,13 +2383,14 @@ function importAllData() {
     reader.onload = function(ev) {
       try {
         var data = JSON.parse(ev.target.result);
-        if (!data.version && !data.clothes) {
+        if (!data.version && !data.clothes && !data.health) {
           showToast('不是有效的备份文件');
           return;
         }
-        var counts = { clothes: 0, records: 0, diaries: 0, health: 0, body: 0 };
+        var counts = { clothes: 0, records: 0, presets: 0, diaries: 0, health: 0, body: 0 };
 
-        if (data.clothes && Array.isArray(data.clothes)) {
+        // Import clothes
+        if (data.clothes && Array.isArray(data.clothes) && data.clothes.length > 0) {
           data.clothes.forEach(function(item) {
             var exists = appData.clothes.some(function(c) { return c.id === item.id; });
             if (!exists) {
@@ -2375,9 +2402,10 @@ function importAllData() {
           saveData(appData);
         }
 
-        if (data.records && Array.isArray(data.records)) {
+        // Import outfit records
+        if (data.records && Array.isArray(data.records) && data.records.length > 0) {
           data.records.forEach(function(item) {
-            var exists = appData.records.some(function(c) { return c.date === item.date && JSON.stringify(c.clothingIds) === JSON.stringify(item.clothingIds); });
+            var exists = appData.records.some(function(c) { return c.id === item.id; });
             if (!exists) {
               appData.records.push(item);
               if (item.id >= appData.nextRecordId) appData.nextRecordId = item.id + 1;
@@ -2387,9 +2415,24 @@ function importAllData() {
           saveData(appData);
         }
 
-        if (data.diaries && Array.isArray(data.diaries)) {
+        // Import presets
+        if (data.presets && Array.isArray(data.presets) && data.presets.length > 0) {
+          if (!appData.presets) appData.presets = [];
+          data.presets.forEach(function(item) {
+            var exists = appData.presets.some(function(p) { return p.id === item.id; });
+            if (!exists) {
+              appData.presets.push(item);
+              if (item.id >= appData.nextPresetId) appData.nextPresetId = item.id + 1;
+              counts.presets++;
+            }
+          });
+          saveData(appData);
+        }
+
+        // Import diaries
+        if (data.diaries && Array.isArray(data.diaries) && data.diaries.length > 0) {
           data.diaries.forEach(function(item) {
-            var exists = diaryData.diaries.some(function(d) { return d.date === item.date; });
+            var exists = diaryData.diaries.some(function(d) { return d.id === item.id; });
             if (!exists) {
               diaryData.diaries.push(item);
               if (item.id >= diaryData.nextId) diaryData.nextId = item.id + 1;
@@ -2399,9 +2442,10 @@ function importAllData() {
           saveDiaryData(diaryData);
         }
 
-        if (data.health && Array.isArray(data.health)) {
+        // Import health records
+        if (data.health && Array.isArray(data.health) && data.health.length > 0) {
           data.health.forEach(function(item) {
-            var exists = healthData.records.some(function(r) { return r.date === item.date && r.type === item.type && r.time === item.time; });
+            var exists = healthData.records.some(function(r) { return r.id === item.id; });
             if (!exists) {
               healthData.records.push(item);
               if (item.id >= healthData.nextId) healthData.nextId = item.id + 1;
@@ -2411,9 +2455,10 @@ function importAllData() {
           saveHealthData(healthData);
         }
 
-        if (data.bodyStats && Array.isArray(data.bodyStats)) {
+        // Import body stats
+        if (data.bodyStats && Array.isArray(data.bodyStats) && data.bodyStats.length > 0) {
           data.bodyStats.forEach(function(item) {
-            var exists = bodyData.records.some(function(r) { return r.date === item.date && r.weight === item.weight; });
+            var exists = bodyData.records.some(function(r) { return r.id === item.id; });
             if (!exists) {
               bodyData.records.push(item);
               if (item.id >= bodyData.nextId) bodyData.nextId = item.id + 1;
@@ -2423,9 +2468,17 @@ function importAllData() {
           saveBodyData(bodyData);
         }
 
-        var total = counts.clothes + counts.records + counts.diaries + counts.health + counts.body;
-        showToast('同步完成: 新增 ' + total + ' 条数据');
+        var total = counts.clothes + counts.records + counts.presets + counts.diaries + counts.health + counts.body;
+        var detail = [];
+        if (counts.clothes) detail.push('衣橱' + counts.clothes);
+        if (counts.records) detail.push('穿搭' + counts.records);
+        if (counts.presets) detail.push('搭配' + counts.presets);
+        if (counts.diaries) detail.push('日记' + counts.diaries);
+        if (counts.health) detail.push('健康' + counts.health);
+        if (counts.body) detail.push('身体' + counts.body);
+        showToast('同步完成: 新增 ' + total + ' 条 (' + detail.join(', ') + ')');
         renderHome();
+        renderWardrobe();
         renderHealthPage();
       } catch (err) {
         showToast('文件解析失败');
