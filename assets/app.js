@@ -531,7 +531,7 @@ function renderMiniCalendar() {
     var cls = 'calendar-day';
     if (isToday) cls += ' today';
     if (hasRec) cls += ' has-record';
-    html += '<div class="' + cls + '">' + d + '</div>';
+    html += '<div class="' + cls + '" onclick="goToDay(\'' + dateStr + '\')">' + d + '</div>';
   }
 
   // Next month days
@@ -542,6 +542,13 @@ function renderMiniCalendar() {
   }
 
   document.getElementById('miniCalendar').innerHTML = html;
+}
+
+function goToDay(dateStr) {
+  switchPage('calendar');
+  calDate = new Date(dateStr);
+  renderCalendar();
+  selectDay(dateStr);
 }
 
 // === Top Lists ===
