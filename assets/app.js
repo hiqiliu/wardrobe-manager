@@ -6,7 +6,7 @@ function loadData() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { clothes: [], records: [], nextId: 1, nextRecordId: 1, diaries: [], nextDiaryId: 1, presets: [], nextPresetId: 1 };
+  return { clothes: [], records: [], nextId: 1, nextRecordId: 1, diaries: [], nextDiaryId: 1, presets: [], nextPresetId: 1, settings: {} };
 }
 
 function saveData(data) {
@@ -17,6 +17,7 @@ var appData = loadData();
 // Ensure presets array exists (backward compat)
 if (!appData.presets) appData.presets = [];
 if (!appData.nextPresetId) appData.nextPresetId = 1;
+if (!appData.settings) appData.settings = {};
 
 // === Utility ===
 function todayStr() {
@@ -96,10 +97,47 @@ function switchPage(name) {
 
 // === Header Date ===
 function updateHeaderDate() {
-  var d = new Date();
-  var weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  document.getElementById('headerDate').textContent =
-    d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 星期' + weekdays[d.getDay()];
+  var settings = appData.settings || {};
+
+  // Welcome text
+  var titleEl = document.getElementById('headerTitle');
+  if (settings.welcomeText) {
+    titleEl.textContent = settings.welcomeText;
+  } else {
+    titleEl.textContent = '我的空间';
+  }
+
+  // Date / subtitle
+  var dateEl = document.getElementById('headerDate');
+  if (settings.subtitle) {
+    dateEl.textContent = settings.subtitle;
+  } else {
+    var d = new Date();
+    var weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    dateEl.textContent = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 星期' + weekdays[d.getDay()];
+  }
+}
+
+// === Settings ===
+function openSettingsModal() {
+  var settings = appData.settings || {};
+  document.getElementById('settingWelcome').value = settings.welcomeText || '';
+  document.getElementById('settingSubtitle').value = settings.subtitle || '';
+  document.getElementById('settingsModal').classList.add('active');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+
+function saveSettings() {
+  if (!appData.settings) appData.settings = {};
+  appData.settings.welcomeText = document.getElementById('settingWelcome').value.trim();
+  appData.settings.subtitle = document.getElementById('settingSubtitle').value.trim();
+  saveData(appData);
+  updateHeaderDate();
+  closeSettingsModal();
+  showToast('设置已保存');
 }
 
 // === Clothing CRUD ===
@@ -2440,6 +2478,7 @@ function exportAllData() {
     clothes: appData.clothes || [],
     records: appData.records || [],
     presets: appData.presets || [],
+    settings: appData.settings || {},
     diaries: diaryData.diaries || [],
     health: healthData.records || [],
     bodyStats: bodyData.records || [],
@@ -2470,6 +2509,9 @@ function exportAllData() {
       total += counts[k];
     }
   });
+  if (data.settings && data.settings.welcomeText) {
+    summary += '页面设置: 已配置\n';
+  }
   summary += '\n共 ' + total + ' 条数据';
   if (total === 0) {
     summary += '\n\n⚠️ 当前浏览器没有找到数据！\n如果你在别的设备上录入的数据，请在那台设备上导出。';
@@ -2546,6 +2588,18 @@ function importAllData() {
           saveData(appData);
         }
 
+        // Import settings
+        if (data.settings && typeof data.settings === 'object') {
+          if (!appData.settings) appData.settings = {};
+          if (data.settings.welcomeText !== undefined) {
+            appData.settings.welcomeText = data.settings.welcomeText;
+          }
+          if (data.settings.subtitle !== undefined) {
+            appData.settings.subtitle = data.settings.subtitle;
+          }
+          saveData(appData);
+        }
+
         // Import diaries
         if (data.diaries && Array.isArray(data.diaries) && data.diaries.length > 0) {
           data.diaries.forEach(function(item) {
@@ -2594,6 +2648,7 @@ function importAllData() {
         if (counts.health) detail.push('健康' + counts.health);
         if (counts.body) detail.push('身体' + counts.body);
         showToast('同步完成: 新增 ' + total + ' 条 (' + detail.join(', ') + ')');
+        updateHeaderDate();
         renderHome();
         renderWardrobe();
         renderHealthPage();
