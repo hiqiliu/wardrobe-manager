@@ -863,10 +863,13 @@
   <!-- Header -->
   <header class="app-header">
     <div>
-      <h1> 我的空间</h1>
+      <h1 id="headerTitle">我的空间</h1>
       <div class="header-date" id="headerDate"></div>
     </div>
-    <button class="btn btn-small btn-primary" onclick="openAddClothingModal()">+ 添加</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-small btn-outline" onclick="openSettingsModal()" title="设置" style="padding:6px 8px">⚙️</button>
+      <button class="btn btn-small btn-primary" onclick="openAddClothingModal()">+ 添加</button>
+    </div>
   </header>
 
   <!-- Pages -->
@@ -1500,6 +1503,28 @@
       <div style="display:flex;gap:10px">
         <button class="btn btn-secondary" style="flex:1" onclick="closePresetModal()">取消</button>
         <button class="btn btn-primary" style="flex:1" onclick="savePreset()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Settings -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">页面设置</div>
+      <div class="form-group">
+        <label class="form-label">欢迎语（显示在标题位置）</label>
+        <input type="text" class="form-input" id="settingWelcome" placeholder="如：早安，今天也要开心" maxlength="20">
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">留空则显示默认标题"我的空间"</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">副标题（显示在日期位置）</label>
+        <input type="text" class="form-input" id="settingSubtitle" placeholder="如：记录每一天的美好" maxlength="30">
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px">留空则显示当前日期</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeSettingsModal()">取消</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveSettings()">保存</button>
       </div>
     </div>
   </div>
