@@ -1198,7 +1198,8 @@ function saveDiary() {
       entry.updatedAt = Date.now();
     }
     editingDiaryId = null;
-    document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '保存日记';
+    var saveBtn2 = document.querySelector('#sub-diary .btn-primary');
+    if (saveBtn2) saveBtn2.textContent = '保存日记';
   } else {
     diaryData.diaries.push({
     id: diaryData.nextId++,
@@ -1235,7 +1236,8 @@ function editTodayDiary(id) {
   document.getElementById('diaryMoodCard').style.display = '';
   // Mark for update instead of new
   editingDiaryId = id;
-  document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '更新日记';
+  var saveBtn3 = document.querySelector('#sub-diary .btn-primary');
+  if (saveBtn3) saveBtn3.textContent = '更新日记';
   window.scrollTo({ top: document.getElementById('diaryMoodCard').offsetTop - 80, behavior: 'smooth' });
 }
 
@@ -1265,7 +1267,8 @@ function renderDiaryPage() {
   document.getElementById('diaryEvent').value = '';
   document.getElementById('diaryThought').value = '';
   document.getElementById('diaryTags').value = '';
-  document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '保存日记';
+  var saveBtn = document.querySelector('#sub-diary .btn-primary');
+  if (saveBtn) saveBtn.textContent = '保存日记';
 
   // Hide edit/delete buttons for single entry display (now per-entry)
   var actionsEl = document.getElementById('diaryTodayActions');
