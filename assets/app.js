@@ -1141,7 +1141,8 @@ var moodLabels = { 5: '很开心', 4: '还不错', 3: '一般', 2: '有点低落
 var moodColors = { 5: '#7a9e7e', 4: '#a8c97f', 3: '#d4a55a', 2: '#c4856c', 1: '#c46b6b' };
 
 function getDiaryForDate(dateStr) {
-  return diaryData.diaries.find(function(d) { return d.date === dateStr; });
+  return diaryData.diaries.filter(function(d) { return d.date === dateStr; })
+    .sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
 }
 
 function getLastYearDiary(dateStr) {
@@ -1173,32 +1174,42 @@ function saveDiary() {
     return;
   }
 
-  var existing = getDiaryForDate(date);
-  if (existing) {
-    existing.mood = selectedMood || existing.mood;
-    existing.event = event || existing.event;
-    existing.thought = thought || existing.thought;
-    existing.tags = tags;
-    existing.updatedAt = Date.now();
+  if (editingDiaryId) {
+    var entry = diaryData.diaries.find(function(d) { return d.id === editingDiaryId; });
+    if (entry) {
+      entry.date = date;
+      entry.mood = selectedMood;
+      entry.event = event;
+      entry.thought = thought;
+      entry.tags = tags;
+      entry.updatedAt = Date.now();
+    }
+    editingDiaryId = null;
+    document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '保存日记';
   } else {
     diaryData.diaries.push({
-      id: diaryData.nextId++,
-      date: date,
-      mood: selectedMood,
-      event: event,
-      thought: thought,
-      tags: tags,
-      createdAt: Date.now()
+    id: diaryData.nextId++,
+    date: date,
+    mood: selectedMood,
+    event: event,
+    thought: thought,
+    tags: tags,
+    createdAt: Date.now()
     });
   }
 
   saveDiaryData(diaryData);
+  selectedMood = 0;
+  document.querySelectorAll('.mood-option').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('diaryEvent').value = '';
+  document.getElementById('diaryThought').value = '';
+  document.getElementById('diaryTags').value = '';
   showToast('日记已保存');
   renderDiaryPage();
 }
 
-function editTodayDiary() {
-  var entry = getDiaryForDate(todayStr());
+function editTodayDiary(id) {
+  var entry = diaryData.diaries.find(function(d) { return d.id === id; });
   if (!entry) return;
   document.getElementById('diaryDate').value = entry.date;
   document.getElementById('diaryEvent').value = entry.event || '';
@@ -1207,14 +1218,19 @@ function editTodayDiary() {
   selectedMood = entry.mood || 0;
   document.querySelectorAll('.mood-option').forEach(function(el) { el.classList.toggle('selected', parseInt(el.dataset.mood) === selectedMood); });
   document.getElementById('diaryMoodCard').style.display = '';
+  // Mark for update instead of new
+  editingDiaryId = id;
+  document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '更新日记';
   window.scrollTo({ top: document.getElementById('diaryMoodCard').offsetTop - 80, behavior: 'smooth' });
 }
 
-function deleteTodayDiary() {
-  var entry = getDiaryForDate(todayStr());
+var editingDiaryId = null;
+
+function deleteTodayDiary(id) {
+  var entry = diaryData.diaries.find(function(d) { return d.id === id; });
   if (!entry) return;
-  if (!confirm('确定要删除今天的日记吗？')) return;
-  diaryData.diaries = diaryData.diaries.filter(function(d) { return d.date !== todayStr(); });
+  if (!confirm('确定要删除这条日记吗？')) return;
+  diaryData.diaries = diaryData.diaries.filter(function(d) { return d.id !== id; });
   saveDiaryData(diaryData);
   renderDiaryPage();
   showToast('已删除');
@@ -1223,54 +1239,46 @@ function deleteTodayDiary() {
 // === Render Diary Page ===
 function renderDiaryPage() {
   var date = todayStr();
-  var entry = getDiaryForDate(date);
+  var entries = getDiaryForDate(date);
 
   // Date input default
   document.getElementById('diaryDate').value = date;
 
-  // Show/hide edit/delete buttons
+  // Always show mood selector and form for new entry
+  selectedMood = 0;
+  editingDiaryId = null;
+  document.querySelectorAll('.mood-option').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('diaryMoodCard').style.display = '';
+  document.getElementById('diaryEvent').value = '';
+  document.getElementById('diaryThought').value = '';
+  document.getElementById('diaryTags').value = '';
+  document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '保存日记';
+
+  // Hide edit/delete buttons for single entry display (now per-entry)
   var actionsEl = document.getElementById('diaryTodayActions');
-  if (actionsEl) {
-    actionsEl.style.display = entry ? '' : 'none';
-  }
+  if (actionsEl) actionsEl.style.display = 'none';
 
-  // Mood
-  if (entry && entry.mood > 0) {
-    selectMood(entry.mood);
-    document.getElementById('diaryMoodCard').style.display = 'none';
-  } else {
-    selectedMood = 0;
-    document.querySelectorAll('.mood-option').forEach(function(el) { el.classList.remove('selected'); });
-    document.getElementById('diaryMoodCard').style.display = '';
-  }
-
-  // Form
-  if (entry) {
-    document.getElementById('diaryEvent').value = entry.event || '';
-    document.getElementById('diaryThought').value = entry.thought || '';
-    document.getElementById('diaryTags').value = (entry.tags || []).join(' ');
-  } else {
-    document.getElementById('diaryEvent').value = '';
-    document.getElementById('diaryThought').value = '';
-    document.getElementById('diaryTags').value = '';
-  }
-
-  // Today entry display
+  // Today entries display
   var todayHtml = '';
-  if (entry) {
-    todayHtml = '<div class="diary-entry">';
-    todayHtml += '<div class="diary-entry-header">';
-    todayHtml += '<span class="diary-entry-mood">' + (moodEmojis[entry.mood] || '') + '</span>';
-    todayHtml += '<span class="diary-entry-date">今日心情：' + (moodLabels[entry.mood] || '未记录') + '</span>';
-    todayHtml += '</div>';
-    if (entry.event) todayHtml += '<div class="diary-entry-text"><strong>事件：</strong>' + escapeHtml(entry.event) + '</div>';
-    if (entry.thought) todayHtml += '<div class="diary-entry-text"><strong>想法：</strong>' + escapeHtml(entry.thought) + '</div>';
-    if (entry.tags && entry.tags.length > 0) {
-      todayHtml += '<div class="diary-entry-tags">';
-      entry.tags.forEach(function(t) { todayHtml += '<span class="diary-tag">' + escapeHtml(t) + '</span>'; });
+  if (entries.length > 0) {
+    entries.forEach(function(entry, idx) {
+      todayHtml += '<div class="diary-entry" style="margin-bottom:8px">';
+      todayHtml += '<div class="diary-entry-header">';
+      todayHtml += '<span class="diary-entry-mood">' + (moodEmojis[entry.mood] || '') + '</span>';
+      todayHtml += '<span class="diary-entry-date">心情：' + (moodLabels[entry.mood] || '未记录') + (entries.length > 1 ? ' (' + (idx + 1) + ')' : '') + '</span>';
+      todayHtml += '<div style="display:flex;gap:4px">';
+      todayHtml += '<button class="btn btn-small btn-outline" onclick="editTodayDiary(' + entry.id + ')">编辑</button>';
+      todayHtml += '<button class="btn btn-small btn-outline" onclick="deleteTodayDiary(' + entry.id + ')" style="color:var(--danger)">删除</button>';
+      todayHtml += '</div></div>';
+      if (entry.event) todayHtml += '<div class="diary-entry-text"><strong>事件：</strong>' + escapeHtml(entry.event) + '</div>';
+      if (entry.thought) todayHtml += '<div class="diary-entry-text"><strong>想法：</strong>' + escapeHtml(entry.thought) + '</div>';
+      if (entry.tags && entry.tags.length > 0) {
+        todayHtml += '<div class="diary-entry-tags">';
+        entry.tags.forEach(function(t) { todayHtml += '<span class="diary-tag">' + escapeHtml(t) + '</span>'; });
+        todayHtml += '</div>';
+      }
       todayHtml += '</div>';
-    }
-    todayHtml += '</div>';
+    });
   } else {
     todayHtml = '<div style="text-align:center;color:var(--muted);font-size:0.85rem;padding:8px">今天还没有记录，在下面开始写吧</div>';
   }
@@ -1279,15 +1287,17 @@ function renderDiaryPage() {
   // Last year today
   var lastYear = getLastYearDiary(date);
   var lastYearHtml = '';
-  if (lastYear) {
-    lastYearHtml = '<div class="diary-entry">';
-    lastYearHtml += '<div class="diary-entry-header">';
-    lastYearHtml += '<span class="diary-entry-mood">' + (moodEmojis[lastYear.mood] || '') + '</span>';
-    lastYearHtml += '<span class="diary-entry-date">去年今日 (' + (parseInt(date.split('-')[0]) - 1) + '年)</span>';
-    lastYearHtml += '</div>';
-    if (lastYear.event) lastYearHtml += '<div class="diary-entry-text">' + escapeHtml(lastYear.event) + '</div>';
-    if (lastYear.thought) lastYearHtml += '<div class="diary-entry-text">' + escapeHtml(lastYear.thought) + '</div>';
-    lastYearHtml += '</div>';
+  if (lastYear.length > 0) {
+    lastYear.forEach(function(entry) {
+      lastYearHtml += '<div class="diary-entry" style="margin-bottom:6px">';
+      lastYearHtml += '<div class="diary-entry-header">';
+      lastYearHtml += '<span class="diary-entry-mood">' + (moodEmojis[entry.mood] || '') + '</span>';
+      lastYearHtml += '<span class="diary-entry-date">去年今日 (' + (parseInt(date.split('-')[0]) - 1) + '年) ' + (moodLabels[entry.mood] || '') + '</span>';
+      lastYearHtml += '</div>';
+      if (entry.event) lastYearHtml += '<div class="diary-entry-text">' + escapeHtml(entry.event) + '</div>';
+      if (entry.thought) lastYearHtml += '<div class="diary-entry-text">' + escapeHtml(entry.thought) + '</div>';
+      lastYearHtml += '</div>';
+    });
   } else {
     lastYearHtml = '<div style="text-align:center;color:var(--muted);font-size:0.82rem;padding:8px">去年今日没有记录</div>';
   }
@@ -1338,11 +1348,11 @@ function renderDiaryHistory() {
     var dateStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     var isToday = (d === today.getDate() && m === today.getMonth() && y === today.getFullYear());
     var hasDiary = datesWithDiary.indexOf(dateStr) !== -1;
-    var entry = hasDiary ? getDiaryForDate(dateStr) : null;
+    var dayEntries = hasDiary ? getDiaryForDate(dateStr) : [];
     var cls = 'calendar-day';
     if (isToday) cls += ' today';
     if (hasDiary) cls += ' has-record';
-    html += '<div class="' + cls + '" onclick="viewDiaryDay(\'' + dateStr + '\')" style="' + (entry && entry.mood ? 'font-weight:bold;' : '') + '">' + d + '</div>';
+    html += '<div class="' + cls + '" onclick="viewDiaryDay(\'' + dateStr + '\')" style="' + (dayEntries.length > 0 && dayEntries[0].mood ? 'font-weight:bold;' : '') + '">' + d + '</div>';
   }
 
   var totalCells = firstDay + daysInMonth;
@@ -1421,35 +1431,42 @@ function renderDiaryHistory() {
 }
 
 function viewDiaryDay(dateStr) {
-  var entry = getDiaryForDate(dateStr);
+  var entries = getDiaryForDate(dateStr);
   var parts = dateStr.split('-');
 
   document.getElementById('diaryViewTitle').textContent = parseInt(parts[1]) + '月' + parseInt(parts[2]) + '日';
 
   var html = '';
-  if (entry) {
-    html += '<div style="text-align:center;margin-bottom:12px">';
-    html += '<span style="font-size:2.5rem">' + (moodEmojis[entry.mood] || '') + '</span>';
-    html += '<div style="font-size:0.85rem;color:var(--muted)">' + (moodLabels[entry.mood] || '未记录心情') + '</div>';
-    html += '</div>';
-    if (entry.event) html += '<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;color:var(--muted);margin-bottom:4px">事件</div><div style="font-size:0.88rem;line-height:1.7">' + escapeHtml(entry.event).replace(/\n/g, '<br>') + '</div></div>';
-    if (entry.thought) html += '<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;color:var(--muted);margin-bottom:4px">感受 & 想法</div><div style="font-size:0.88rem;line-height:1.7">' + escapeHtml(entry.thought).replace(/\n/g, '<br>') + '</div></div>';
-    if (entry.tags && entry.tags.length > 0) {
-      html += '<div class="diary-entry-tags">';
-      entry.tags.forEach(function(t) { html += '<span class="diary-tag">' + escapeHtml(t) + '</span>'; });
+  if (entries.length > 0) {
+    entries.forEach(function(entry, idx) {
+      if (idx > 0) html += '<div style="border-top:1px dashed var(--rule);margin:10px 0"></div>';
+      html += '<div style="text-align:center;margin-bottom:8px">';
+      html += '<span style="font-size:2rem">' + (moodEmojis[entry.mood] || '') + '</span>';
+      html += '<div style="font-size:0.82rem;color:var(--muted)">' + (moodLabels[entry.mood] || '未记录心情') + (entries.length > 1 ? ' (' + (idx + 1) + ')' : '') + '</div>';
       html += '</div>';
-    }
+      if (entry.event) html += '<div style="margin-bottom:8px"><div style="font-size:0.78rem;font-weight:600;color:var(--muted);margin-bottom:4px">事件</div><div style="font-size:0.88rem;line-height:1.7">' + escapeHtml(entry.event).replace(/\n/g, '<br>') + '</div></div>';
+      if (entry.thought) html += '<div style="margin-bottom:8px"><div style="font-size:0.78rem;font-weight:600;color:var(--muted);margin-bottom:4px">感受 & 想法</div><div style="font-size:0.88rem;line-height:1.7">' + escapeHtml(entry.thought).replace(/\n/g, '<br>') + '</div></div>';
+      if (entry.tags && entry.tags.length > 0) {
+        html += '<div class="diary-entry-tags">';
+        entry.tags.forEach(function(t) { html += '<span class="diary-tag">' + escapeHtml(t) + '</span>'; });
+        html += '</div>';
+      }
+    });
+
     // Last year
     var lastYear = getLastYearDiary(dateStr);
-    if (lastYear) {
+    if (lastYear.length > 0) {
       html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--rule)">';
       html += '<div style="font-size:0.78rem;font-weight:600;color:var(--muted);margin-bottom:6px">去年今日 (' + (parseInt(parts[0]) - 1) + '年)</div>';
-      html += '<div style="font-size:2rem">' + (moodEmojis[lastYear.mood] || '') + '</div>';
-      if (lastYear.event) html += '<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">' + escapeHtml(lastYear.event).substring(0, 100) + '</div>';
+      lastYear.forEach(function(ly) {
+        html += '<div style="font-size:1.5rem">' + (moodEmojis[ly.mood] || '') + '</div>';
+        if (ly.event) html += '<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">' + escapeHtml(ly.event).substring(0, 100) + '</div>';
+      });
       html += '</div>';
     }
 
     document.getElementById('diaryDeleteBtn').onclick = function() {
+      if (!confirm('确定要删除这天的所有日记吗？')) return;
       diaryData.diaries = diaryData.diaries.filter(function(d) { return d.date !== dateStr; });
       saveDiaryData(diaryData);
       closeDiaryViewModal();
@@ -1561,8 +1578,8 @@ function renderMoodTrend() {
   var html = '<div class="mood-chart">';
   for (var d = 1; d <= daysInMonth; d++) {
     var dateStr = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    var entry = getDiaryForDate(dateStr);
-    var mood = entry && entry.mood > 0 ? entry.mood : 0;
+    var entries = getDiaryForDate(dateStr);
+    var mood = entries.length > 0 && entries[0].mood > 0 ? entries[0].mood : 0;
     var height = mood > 0 ? (mood * 18) : 4;
     var color = mood > 0 ? moodColors[mood] : 'var(--rule)';
     html += '<div class="mood-bar-wrapper">';
