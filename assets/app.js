@@ -1136,6 +1136,19 @@ function saveDiaryData(data) {
 
 var diaryData = loadDiaryData();
 
+// Backward compat: ensure nextId exists and all entries have id
+if (!diaryData.nextId) {
+  diaryData.nextId = 1;
+}
+if (diaryData.diaries && diaryData.diaries.length > 0) {
+  diaryData.diaries.forEach(function(d) {
+    if (!d.id) {
+      d.id = diaryData.nextId++;
+    }
+  });
+  saveDiaryData(diaryData);
+}
+
 var moodEmojis = { 5: '😄', 4: '🙂', 3: '😐', 2: '😔', 1: '😢' };
 var moodLabels = { 5: '很开心', 4: '还不错', 3: '一般', 2: '有点低落', 1: '很差' };
 var moodColors = { 5: '#7a9e7e', 4: '#a8c97f', 3: '#d4a55a', 2: '#c4856c', 1: '#c46b6b' };
@@ -1208,6 +1221,8 @@ function saveDiary() {
   renderDiaryPage();
 }
 
+var editingDiaryId = null;
+
 function editTodayDiary(id) {
   var entry = diaryData.diaries.find(function(d) { return d.id === id; });
   if (!entry) return;
@@ -1223,8 +1238,6 @@ function editTodayDiary(id) {
   document.querySelector('#sub-diary .card:last-of-type .btn-primary').textContent = '更新日记';
   window.scrollTo({ top: document.getElementById('diaryMoodCard').offsetTop - 80, behavior: 'smooth' });
 }
-
-var editingDiaryId = null;
 
 function deleteTodayDiary(id) {
   var entry = diaryData.diaries.find(function(d) { return d.id === id; });
