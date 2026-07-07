@@ -931,20 +931,28 @@
     <div class="page" id="page-wardrobe">
       <div class="search-bar">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="搜索衣物名称..." oninput="renderWardrobe()">
+        <input type="text" id="searchInput" placeholder="搜索..." oninput="renderWardrobe()">
       </div>
-      <div class="filter-bar" id="filterBar">
-        <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">全部</div>
-        <div class="filter-chip" data-filter="上装" onclick="setFilter('上装')">上装</div>
-        <div class="filter-chip" data-filter="下装" onclick="setFilter('下装')">下装</div>
-        <div class="filter-chip" data-filter="外套" onclick="setFilter('外套')">外套</div>
-        <div class="filter-chip" data-filter="连衣裙" onclick="setFilter('连衣裙')">连衣裙</div>
-        <div class="filter-chip" data-filter="鞋子" onclick="setFilter('鞋子')">鞋子</div>
-        <div class="filter-chip" data-filter="配饰" onclick="setFilter('配饰')">配饰</div>
-        <div class="filter-chip" data-filter="内衣" onclick="setFilter('内衣')">内衣</div>
-        <div class="filter-chip" data-filter="搭配" onclick="setFilter('搭配')">搭配</div>
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchWardrobeTab('clothes')">👕 衣物</button>
+        <button class="sub-tab" onclick="switchWardrobeTab('presets')">👔 搭配</button>
       </div>
-      <div id="wardrobeList"></div>
+      <div class="sub-page active" id="wardrobe-clothes">
+        <div class="filter-bar" id="filterBar">
+          <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">全部</div>
+          <div class="filter-chip" data-filter="上装" onclick="setFilter('上装')">上装</div>
+          <div class="filter-chip" data-filter="下装" onclick="setFilter('下装')">下装</div>
+          <div class="filter-chip" data-filter="外套" onclick="setFilter('外套')">外套</div>
+          <div class="filter-chip" data-filter="连衣裙" onclick="setFilter('连衣裙')">连衣裙</div>
+          <div class="filter-chip" data-filter="鞋子" onclick="setFilter('鞋子')">鞋子</div>
+          <div class="filter-chip" data-filter="配饰" onclick="setFilter('配饰')">配饰</div>
+          <div class="filter-chip" data-filter="内衣" onclick="setFilter('内衣')">内衣</div>
+        </div>
+        <div id="clothesList"></div>
+      </div>
+      <div class="sub-page" id="wardrobe-presets">
+        <div id="presetList"></div>
+      </div>
     </div>
 
     <!-- Calendar Page -->
