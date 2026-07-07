@@ -733,59 +733,50 @@ function usePreset(presetId) {
 }
 
 // === Wardrobe Page ===
+var wardrobeSubTab = 'clothes';
+
+function switchWardrobeTab(tab) {
+  wardrobeSubTab = tab;
+  document.querySelectorAll('#page-wardrobe .sub-tab').forEach(function(el) {
+    el.classList.toggle('active', el.textContent.indexOf(tab === 'clothes' ? '衣物' : '搭配') !== -1);
+  });
+  document.getElementById('wardrobe-clothes').classList.toggle('active', tab === 'clothes');
+  document.getElementById('wardrobe-presets').classList.toggle('active', tab === 'presets');
+  renderWardrobe();
+}
+
 function renderWardrobe() {
   var search = document.getElementById('searchInput').value.trim().toLowerCase();
-  var html = '';
-
-  // Show presets when filter is "搭配" or "all"
-  if (currentFilter === '搭配' || currentFilter === 'all') {
-    var presets = appData.presets || [];
-    if (currentFilter === 'all' && presets.length > 0) {
-      // Show a collapsible section in "all" view
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 8px;cursor:pointer" onclick="document.getElementById(\'presetListAll\').classList.toggle(\'hidden\')">';
-      html += '<span style="font-weight:600;font-size:0.92rem">固定搭配 (' + presets.length + ')</span>';
-      html += '<span style="font-size:0.78rem;color:var(--muted)">展开/收起 ▾</span>';
-      html += '</div>';
-      html += '<div id="presetListAll">';
-      html += renderPresetCards(presets, search);
-      html += '</div>';
-    } else if (currentFilter === '搭配') {
-      if (presets.length === 0) {
-        html += '<div class="empty-state">';
-        html += '<div class="empty-icon">👔</div>';
-        html += '<div class="empty-text">还没有固定搭配<br>点击下方创建</div>';
-        html += '</div>';
-      } else {
-        html += renderPresetCards(presets, search);
-      }
-    }
+  if (wardrobeSubTab === 'clothes') {
+    renderClothesList(search);
+  } else {
+    renderPresetList(search);
   }
+}
 
-  // Show individual clothes when filter is not "搭配"
-  if (currentFilter !== '搭配') {
-    var list = appData.clothes.filter(function(c) {
-      if (currentFilter !== 'all' && c.category !== currentFilter) return false;
-      if (search && c.name.toLowerCase().indexOf(search) === -1) return false;
-      return true;
-    });
+function renderClothesList(search) {
+  var list = appData.clothes.filter(function(c) {
+    if (currentFilter !== 'all' && c.category !== currentFilter) return false;
+    if (search && c.name.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
 
-    var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰', '内衣'];
-    list.sort(function(a, b) {
-      var ai = catOrder.indexOf(a.category);
-      var bi = catOrder.indexOf(b.category);
-      if (ai !== bi) return ai - bi;
-      return a.name.localeCompare(b.name);
-    });
+  var catOrder = ['上装', '下装', '外套', '连衣裙', '鞋子', '配饰', '内衣'];
+  list.sort(function(a, b) {
+    var ai = catOrder.indexOf(a.category);
+    var bi = catOrder.indexOf(b.category);
+    if (ai !== bi) return ai - bi;
+    return a.name.localeCompare(b.name);
+  });
 
-    if (list.length === 0 && currentFilter === 'all') {
-      // presets already shown above
-    } else if (list.length === 0) {
-      html += '<div class="empty-state">';
-      html += '<div class="empty-icon">👕</div>';
-      html += '<div class="empty-text">该分类下暂无衣物</div>';
-      html += '</div>';
-    } else {
-      list.forEach(function(c) {
+  var html = '';
+  if (list.length === 0) {
+    html += '<div class="empty-state">';
+    html += '<div class="empty-icon">👕</div>';
+    html += '<div class="empty-text">该分类下暂无衣物</div>';
+    html += '</div>';
+  } else {
+    list.forEach(function(c) {
       var wearCount = getClothingWearCount(c.id);
       var costPerWear = wearCount > 0 ? (c.price / wearCount).toFixed(1) : '-';
       var stars = '';
@@ -822,17 +813,37 @@ function renderWardrobe() {
       html += '</div>';
       html += '</div>';
     });
-    }
   }
 
-  // Add "create preset" button at bottom when in 搭配 filter
-  if (currentFilter === '搭配') {
-    html += '<div style="text-align:center;margin-top:12px">';
-    html += '<button class="btn btn-small btn-primary" onclick="openPresetModal()">+ 创建固定搭配</button>';
+  document.getElementById('clothesList').innerHTML = html;
+}
+
+function renderPresetList(search) {
+  var presets = appData.presets || [];
+  var filtered = presets.filter(function(p) {
+    if (!search) return true;
+    if (p.name.toLowerCase().indexOf(search) !== -1) return true;
+    return p.clothingIds.some(function(cid) {
+      var c = appData.clothes.find(function(cl) { return cl.id === cid; });
+      return c && c.name.toLowerCase().indexOf(search) !== -1;
+    });
+  });
+
+  var html = '';
+  if (filtered.length === 0) {
+    html += '<div class="empty-state">';
+    html += '<div class="empty-icon">👔</div>';
+    html += '<div class="empty-text">还没有固定搭配</div>';
     html += '</div>';
+  } else {
+    html += renderPresetCards(filtered, search);
   }
 
-  document.getElementById('wardrobeList').innerHTML = html;
+  html += '<div style="text-align:center;margin-top:12px">';
+  html += '<button class="btn btn-small btn-primary" onclick="openPresetModal()">+ 创建固定搭配</button>';
+  html += '</div>';
+
+  document.getElementById('presetList').innerHTML = html;
 }
 
 function renderPresetCards(presets, search) {
