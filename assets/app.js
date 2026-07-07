@@ -1765,6 +1765,7 @@ function switchSubPage(name) {
   document.querySelectorAll('.sub-page').forEach(function(p) { p.classList.remove('active'); });
   event.currentTarget.classList.add('active');
   document.getElementById('sub-' + name).classList.add('active');
+  if (name === 'diary') renderDiaryPage();
   if (name === 'health') renderHealthPage();
 }
 
